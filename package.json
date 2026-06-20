@@ -1,0 +1,18 @@
+{
+  "name": "fehlerfix",
+  "version": "1.0.0",
+  "description": "FehlerFix – KI-gestützte, adaptive Rechtschreib-Lern-App für Kinder der Klassen 3–7",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "openai": "^4.104.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

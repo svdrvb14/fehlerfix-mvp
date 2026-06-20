@@ -1,0 +1,1096 @@
+/* ─────────────────────────────────────────────────────────
+ * FehlerFix – Stylesheet
+ * Design-System: Coral / Blue / Green-Soft, Inter, runde Karten
+ * ───────────────────────────────────────────────────────── */
+
+:root {
+  --coral: #ec6e68;
+  --coral-soft: #fde9e7;
+  --blue: #7da7d9;
+  --blue-soft: #dce8f5;
+  --blue-medium: #5b8db8;
+  --green-soft: #d9eddc;
+  --ink: #1a1a2e;
+  --muted: #6b6b7b;
+  --bg: #fafaf7;
+  --white: #ffffff;
+  --border: #e8e8e0;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  /* iOS: kein Text-Markieren / Kontextmenü, wenn der Stift versehentlich
+     über Text wandert. Inputs/Textareas bekommen es unten zurück. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Falls später doch Inputs/Textareas im UI auftauchen: dort wieder erlauben */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: linear-gradient(135deg, #e8f0f8 0%, #f5f0f5 30%, #f0f5f0 70%, #e8f5ec 100%);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Hintergrund-Blobs */
+.blob {
+  position: fixed;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(0.5px);
+}
+.blob-tr {
+  width: 400px;
+  height: 400px;
+  background: rgba(217, 237, 220, 0.55);
+  top: -100px;
+  right: -100px;
+}
+.blob-bl {
+  width: 320px;
+  height: 320px;
+  background: rgba(220, 232, 245, 0.5);
+  bottom: -90px;
+  left: -90px;
+}
+
+/* ─── Navigation ─────────────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 40px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nav-logo {
+  width: 40px;
+  height: 40px;
+  background: var(--white);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--coral);
+}
+.nav-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.brand-fehler {
+  color: var(--coral);
+}
+.brand-fix {
+  color: var(--blue);
+}
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+.nav-link {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+.nav-login {
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 24px;
+  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.nav-login:hover {
+  transform: translateY(-1px);
+}
+
+/* ─── Layout / Screens ───────────────────────────────── */
+#app {
+  position: relative;
+  z-index: 1;
+  padding: 48px 24px 80px;
+  min-height: calc(100vh - 73px - 50px);
+}
+
+.screen {
+  display: none;
+  opacity: 0;
+  transform: translateY(10px);
+}
+.screen.active {
+  display: block;
+  animation: fadeInUp 0.4s ease forwards;
+}
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+/* ─── Typo Utilities ─────────────────────────────────── */
+.title-xl {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 12px 0 18px;
+  line-height: 1.1;
+}
+.title-l {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 12px 0 14px;
+  letter-spacing: -0.01em;
+}
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.lead {
+  font-size: 1.05rem;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 600px;
+  margin: 0 auto 28px;
+}
+
+/* ─── Karten / Buttons ──────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+}
+.card-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  color: var(--blue);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.btn-primary {
+  background: var(--coral);
+  color: white;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 30px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(236, 110, 104, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.btn-primary:hover:not(:disabled) {
+  transform: scale(1.02);
+  background: #e35d57;
+  box-shadow: 0 6px 22px rgba(236, 110, 104, 0.38);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-lg {
+  padding: 18px 40px;
+  font-size: 1.05rem;
+  border-radius: 16px;
+}
+
+/* ─── Screen 0: Willkommen ───────────────────────────── */
+.welcome {
+  max-width: 800px;
+  margin: 60px auto 0;
+  text-align: center;
+}
+.feature-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 56px;
+}
+.feature {
+  background: white;
+  border-radius: 16px;
+  padding: 22px 18px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.feature-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin: 0 auto 12px;
+}
+.icon-green {
+  background: var(--green-soft);
+}
+.icon-blue {
+  background: var(--blue-soft);
+}
+.icon-coral {
+  background: var(--coral-soft);
+}
+.feature-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin-bottom: 4px;
+}
+.feature-text {
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+/* ─── Profile-Screen ─────────────────────────────────── */
+.profile-wrap {
+  max-width: 760px;
+  margin: 30px auto 0;
+  text-align: center;
+}
+.profile-card {
+  margin: 28px 0 24px;
+  text-align: left;
+}
+.profile-field {
+  margin-bottom: 22px;
+}
+.profile-field:last-child {
+  margin-bottom: 0;
+}
+.profile-label {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  color: var(--blue);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.grade-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.school-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.choice-btn {
+  background: white;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 8px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.school-grid .choice-btn {
+  padding: 16px 14px;
+  font-size: 0.98rem;
+  text-align: left;
+}
+.choice-btn:hover {
+  border-color: var(--blue);
+  transform: translateY(-1px);
+}
+.choice-btn.selected {
+  background: var(--coral);
+  border-color: var(--coral);
+  color: white;
+  box-shadow: 0 4px 14px rgba(236, 110, 104, 0.32);
+}
+@media (max-width: 760px) {
+  .grade-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .school-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Screen 1: Schreiben ────────────────────────────── */
+.write-wrap {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  transition: background 0.25s ease, transform 0.25s ease;
+}
+.dot.active {
+  background: var(--coral);
+  transform: scale(1.15);
+}
+.dot.done {
+  background: var(--blue);
+}
+.step-label {
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 22px;
+  font-weight: 600;
+}
+
+.task-card {
+  margin-bottom: 18px;
+}
+.task-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.task-desc {
+  color: var(--muted);
+  margin: 0 0 8px;
+  line-height: 1.55;
+}
+.task-hint {
+  font-size: 0.85rem;
+  color: var(--blue-medium);
+  font-weight: 600;
+}
+
+.notebook-card {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+.notebook-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+.notebook-label {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.notebook-actions {
+  display: flex;
+  gap: 18px;
+}
+.link-action {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.link-action:hover {
+  color: var(--coral);
+}
+
+.canvas-wrap {
+  position: relative;
+  background-color: white;
+  /* Schullinien wie im Heft – als CSS-Background.
+     Der Radierer im Canvas kann sie nicht löschen, weil sie unter dem Canvas liegen.
+     Beim Export ans Vision-Grading werden sie NICHT mitgeschickt (siehe app.js toJpeg). */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 47px,
+    #4a5568 47px,
+    #4a5568 48px
+  );
+  background-position: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  /* Skaliert mit der Bildschirmhöhe: viel mehr Platz auf iPad/Tablet,
+     aber begrenzt, damit Aufgabe + Submit-Button noch sichtbar bleiben. */
+  height: clamp(320px, 55vh, 600px);
+  overflow: hidden;
+}
+/* Canvas selbst transparent, damit die Schullinien durchscheinen */
+#draw-canvas,
+#ex-canvas {
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  display: block;
+  background: transparent;
+  /* none: kein System-Scroll/-Zoom über den Canvas – Handballen wird ignoriert,
+     der Stift schreibt sauber ohne Gesten-Interpretation */
+  touch-action: none;
+}
+.canvas-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  pointer-events: none;
+  font-size: 0.95rem;
+  opacity: 0.7;
+}
+.canvas-placeholder.hidden {
+  display: none;
+}
+
+.tool-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.tool-pill {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.tool-pill.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+}
+.tool-pill:hover:not(.active) {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.write-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 4px 0;
+}
+
+/* ─── Screen 2: Loading ──────────────────────────────── */
+.loading {
+  max-width: 480px;
+  margin: 80px auto 0;
+  text-align: center;
+}
+.spinner {
+  width: 80px;
+  height: 80px;
+  border: 5px solid rgba(125, 167, 217, 0.2);
+  border-top: 5px solid var(--blue);
+  border-radius: 50%;
+  margin: 0 auto 30px;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.loading-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.loading-sub {
+  color: var(--muted);
+  font-size: 0.98rem;
+}
+
+/* ─── Screen 3: Ready ───────────────────────────────── */
+.ready,
+.error-wrap {
+  max-width: 600px;
+  margin: 70px auto 0;
+  text-align: center;
+}
+.ready-emoji {
+  font-size: 4.5rem;
+  margin-bottom: 8px;
+}
+
+/* ─── Screen 4: Übung ────────────────────────────────── */
+.exercise-wrap {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.exercise-topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.ex-num {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.level-badge {
+  background: var(--blue-soft);
+  color: var(--blue-medium);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.instruction-card {
+  margin-bottom: 18px;
+}
+
+/* Aufgaben-Text (Lückentext bzw. Fehlertext), den das Kind abschreiben soll */
+.display-text {
+  margin-top: 14px;
+  padding: 18px 22px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 1.25rem;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.display-text .blank {
+  display: inline-block;
+  min-width: 50px;
+  border-bottom: 2.5px solid var(--coral);
+  text-align: center;
+  font-weight: 700;
+  color: var(--coral);
+  margin: 0 2px;
+}
+
+/* ─── Audio-Diktat-Player ─── */
+.dictation-player {
+  margin-top: 14px;
+  padding: 20px 22px;
+  background: var(--blue-soft);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.dictation-icon {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+.dictation-status {
+  text-align: center;
+  font-size: 1rem;
+  color: var(--ink);
+  font-weight: 500;
+  max-width: 460px;
+  line-height: 1.45;
+}
+.dictation-status.is-speaking {
+  color: var(--blue-medium);
+  font-weight: 600;
+}
+.dictation-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.player-btn {
+  background: white;
+  border: 2px solid var(--blue);
+  color: var(--blue-medium);
+  border-radius: 999px;
+  padding: 12px 22px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.player-btn:hover {
+  transform: translateY(-1px);
+}
+.player-btn-main {
+  background: var(--blue);
+  color: white;
+  box-shadow: 0 4px 14px rgba(125, 167, 217, 0.35);
+  padding: 14px 32px;
+  font-size: 1.05rem;
+}
+.player-btn-main:hover {
+  background: var(--blue-medium);
+}
+
+.ex-content {
+  margin-bottom: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Übungs-Items */
+.ex-item {
+  background: white;
+  border-radius: 14px;
+  padding: 20px 22px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+.ex-item.correct {
+  border-color: #6dbe7a;
+  background: #f4fbf5;
+}
+.ex-item.wrong {
+  border-color: var(--coral);
+  background: #fff6f5;
+}
+
+.ex-sentence {
+  font-size: 1.2rem;
+  line-height: 1.7;
+  font-weight: 500;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 6px;
+}
+.ex-prompt {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+
+.blank-input,
+.word-input {
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-weight: 600;
+  border: none;
+  border-bottom: 2.5px solid var(--blue);
+  background: var(--blue-soft);
+  padding: 4px 10px;
+  border-radius: 6px 6px 0 0;
+  width: 80px;
+  text-align: center;
+  color: var(--ink);
+  outline: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.blank-input:focus,
+.word-input:focus {
+  background: white;
+  border-bottom-color: var(--coral);
+}
+.word-input {
+  width: 100%;
+  max-width: 320px;
+  font-size: 1.2rem;
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: left;
+}
+.word-input:focus {
+  border-color: var(--blue);
+  background: white;
+}
+
+/* Choose-Optionen */
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.option-btn {
+  background: var(--blue-soft);
+  border: 2px solid transparent;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-family: inherit;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.option-btn:hover {
+  transform: translateY(-1px);
+}
+.option-btn.selected {
+  background: var(--blue);
+  color: white;
+  border-color: var(--blue);
+}
+.option-btn.locked {
+  cursor: default;
+  pointer-events: none;
+}
+.option-btn.is-correct {
+  background: #e6f4e8;
+  border-color: #6dbe7a;
+  color: #2a6c34;
+}
+.option-btn.is-wrong {
+  background: #fde9e7;
+  border-color: var(--coral);
+  color: #a8423d;
+  text-decoration: line-through;
+}
+
+/* Wrong-word Anzeige */
+.wrong-word {
+  display: inline-block;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--coral);
+  text-decoration: line-through;
+  margin-right: 14px;
+}
+
+/* Feedback */
+.item-feedback {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+.fb-correct {
+  color: #2a6c34;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fb-wrong {
+  color: var(--coral);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fb-solution {
+  margin-top: 6px;
+  color: var(--blue-medium);
+  font-weight: 600;
+}
+.fb-explanation {
+  margin-top: 8px;
+  color: var(--ink);
+  background: var(--blue-soft);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.ex-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* ─── Screen 5: Fortschritt ──────────────────────────── */
+.progress-wrap {
+  max-width: 900px;
+  margin: 30px auto 0;
+  text-align: center;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin: 36px 0 32px;
+  text-align: left;
+}
+.stat-card {
+  background: white;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  position: relative;
+}
+.stat-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.stat-kicker-blue {
+  color: var(--blue);
+}
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+}
+.stat-bignum {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--ink);
+  line-height: 1;
+  margin: 4px 0 10px;
+}
+.stat-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.level-card {
+  background: var(--blue-medium);
+  color: white;
+}
+.level-card .stat-kicker {
+  color: rgba(255, 255, 255, 0.8);
+}
+.level-fire {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+.level-progress {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  margin: 14px 0 8px;
+  overflow: hidden;
+}
+.level-progress-fill {
+  height: 100%;
+  background: white;
+  width: 0%;
+  border-radius: 999px;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.level-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* KI-Rückmeldung auf dem Fortschritts-Screen */
+.feedback-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin: 8px 0 18px;
+  text-align: left;
+}
+.feedback-card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  border-left: 4px solid var(--border);
+}
+.fb-good-card {
+  border-left-color: #6dbe7a;
+  background: #f4fbf5;
+}
+.fb-bad-card {
+  border-left-color: var(--coral);
+  background: #fff6f5;
+}
+.fb-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.fb-good-card .fb-kicker {
+  color: #2a6c34;
+}
+.fb-bad-card .fb-kicker {
+  color: var(--coral);
+}
+.fb-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.fb-list li {
+  margin-bottom: 4px;
+}
+
+/* Wort-Korrektur-Einträge im roten Kästchen */
+.word-corrections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.word-correction {
+  background: white;
+  border-radius: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--coral);
+}
+.word-correction-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.word-wrong {
+  color: var(--coral);
+  text-decoration: line-through;
+}
+.word-arrow {
+  color: var(--muted);
+  font-weight: 400;
+}
+.word-correct {
+  color: #2a6c34;
+}
+.word-explanation {
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  font-weight: 400;
+  margin: 0;
+}
+.word-corrections-empty {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+.explanation-card {
+  background: var(--blue-soft);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin: 0 0 22px;
+  text-align: left;
+  border-left: 4px solid var(--blue);
+}
+.explanation-card p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+
+/* ─── Responsive (iPad/Tablet) ───────────────────────── */
+@media (max-width: 760px) {
+  .nav {
+    padding: 14px 18px;
+  }
+  .nav-links {
+    gap: 14px;
+  }
+  .nav-link {
+    display: none;
+  }
+  #app {
+    padding: 30px 16px 60px;
+  }
+  .title-xl {
+    font-size: 2rem;
+  }
+  .title-l {
+    font-size: 1.5rem;
+  }
+  .feature-row,
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  /* Auf sehr schmalen/kleinen Screens etwas niedriger, sonst greift clamp() */
+  .canvas-wrap {
+    height: clamp(280px, 45vh, 480px);
+  }
+}
