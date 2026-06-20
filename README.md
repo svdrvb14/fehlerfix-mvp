@@ -6,7 +6,7 @@ KI-gestützte, **adaptive** Rechtschreib-Lern-App für Kinder der Klassen 3–7.
 
 ### 1. Voraussetzungen
 - Node.js **>= 18**
-- Ein OpenAI API-Key (https://platform.openai.com/api-keys)
+- Ein Anthropic API-Key (https://console.anthropic.com)
 
 ### 2. Installation
 ```bash
@@ -20,8 +20,9 @@ cp .env.example .env
 ```
 Öffne `.env` und ersetze `dein-key-hier`:
 ```
-OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
 ```
+Optional: `CLAUDE_MODEL=claude-opus-4-8` setzen für Top-Qualität (teurer).
 
 ### 4. Starten
 ```bash
@@ -40,7 +41,7 @@ npm start
 ## Tech-Stack
 - Backend: Node.js + Express
 - Frontend: Vanilla HTML / CSS / JavaScript
-- KI: OpenAI GPT-5 (Chat Completions API mit Vision + JSON-Mode)
+- KI: Anthropic Claude (Sonnet 4.6 default, Opus 4.8 optional) via Messages API mit Vision
 - Handschrift-Eingabe: HTML5 Canvas
 
 ## Hinweise

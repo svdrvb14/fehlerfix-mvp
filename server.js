@@ -18,30 +18,32 @@
  *                            + Erkennung NEUER Features
  *                            + Memory-Update (mastery, right, wrong)
  *
- *   KI: OpenAI GPT-5 via Chat Completions API
+ *   KI: Anthropic Claude (Sonnet/Opus) via Messages API mit Vision
  */
 
 // override:true → .env-Datei gewinnt immer, auch wenn die Shell bereits
-// eine (z.B. leere) OPENAI_API_KEY-Variable gesetzt hat.
+// eine (z.B. leere) ANTHROPIC_API_KEY-Variable gesetzt hat.
 require('dotenv').config({ override: true });
 
 const express = require('express');
 const path = require('path');
-const OpenAI = require('openai').default || require('openai');
+const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai/sdk');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const MODEL = 'gpt-5';
+// Modell-Auswahl über ENV. Default: Sonnet 4.6 (schnell + günstig).
+// Für Opus: CLAUDE_MODEL=claude-opus-4-8 setzen (im Render-Dashboard, kein Redeploy nötig).
+const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
-if (!process.env.OPENAI_API_KEY) {
-  console.error('\n[FehlerFix] ⚠️  OPENAI_API_KEY ist nicht gesetzt!');
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error('\n[FehlerFix] ⚠️  ANTHROPIC_API_KEY ist nicht gesetzt!');
   console.error('[FehlerFix] Lege eine .env-Datei an (siehe .env.example) und trage deinen Key ein.');
   console.error('[FehlerFix] Server startet trotzdem – Endpoints liefern dann Fehler bis Key gesetzt ist.\n');
 }
 
 // Lazy-Init: kein Crash beim Start, falls Key fehlt – stattdessen klare Fehlermeldung bei Requests
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const anthropic = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   : null;
 
 app.use(express.json({ limit: '30mb' }));
@@ -66,7 +68,8 @@ app.use((req, res, next) => {
 app.get('/api/health', (req, res) => {
   res.json({
     ok: true,
-    apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY),
+    apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+    provider: 'anthropic',
     model: MODEL,
     time: new Date().toISOString(),
   });
@@ -247,66 +250,69 @@ function parseJsonResponse(rawText) {
 }
 
 /**
- * OpenAI Chat Completions: Bild im image_url-Format.
+ * Anthropic Messages API: Bild als base64 source-Block.
  */
 function toImageBlock(dataUrl) {
+  const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(dataUrl);
+  const mediaType = match ? match[1] : 'image/jpeg';
+  const data = match ? match[2] : dataUrl;
   return {
-    type: 'image_url',
-    image_url: { url: dataUrl },
+    type: 'image',
+    source: { type: 'base64', media_type: mediaType, data },
   };
 }
 
 /**
- * Wrapper für OpenAI-Calls. Liefert den Antwort-String und loggt Dauer.
- * Erwartet Messages im OpenAI-Format (text/image_url-Blöcke).
+ * Wrapper für Claude-Calls. Liefert den Antwort-String und loggt Dauer + Tokens.
+ * userContent kann ein String ODER ein Array aus text/image-Blöcken sein.
  */
-async function callOpenAI({ label, systemPrompt, userContent, maxTokens = 8000 }) {
-  if (!openai) {
-    const e = new Error('OPENAI_API_KEY ist nicht gesetzt – bitte in .env eintragen und Server neu starten.');
+async function callClaude({ label, systemPrompt, userContent, maxTokens = 4000 }) {
+  if (!anthropic) {
+    const e = new Error('ANTHROPIC_API_KEY ist nicht gesetzt – bitte in .env eintragen und Server neu starten.');
     e.status = 500;
     throw e;
   }
   const started = Date.now();
   try {
-    // GPT-5 ist ein Reasoning-Modell: verbraucht intern viele "denk"-Tokens.
-    // - reasoning_effort 'low' = weniger interne Verarbeitung, mehr Budget für Output
-    // - max_completion_tokens bewusst hoch, damit Reasoning + Output reinpassen
-    const response = await openai.chat.completions.create({
+    const response = await anthropic.messages.create({
       model: MODEL,
-      response_format: { type: 'json_object' },
-      max_completion_tokens: maxTokens,
-      reasoning_effort: 'low',
+      max_tokens: maxTokens,
+      system: systemPrompt,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent },
+        {
+          role: 'user',
+          content: typeof userContent === 'string'
+            ? [{ type: 'text', text: userContent }]
+            : userContent,
+        },
       ],
     });
     const elapsed = Date.now() - started;
-    const choice = response.choices?.[0];
-    const text = choice?.message?.content || '';
-    const finishReason = choice?.finish_reason;
+    const text = (response.content || [])
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text)
+      .join('\n');
+    const stop = response.stop_reason;
     const usage = response.usage;
 
     console.log(
-      `[${label}] OpenAI-Antwort nach ${elapsed}ms (${text.length} chars, finish=${finishReason}, ` +
-        `tokens: in=${usage?.prompt_tokens}, out=${usage?.completion_tokens}, ` +
-        `reasoning=${usage?.completion_tokens_details?.reasoning_tokens ?? '?'})`
+      `[${label}] Claude-Antwort nach ${elapsed}ms (${text.length} chars, stop=${stop}, ` +
+        `tokens: in=${usage?.input_tokens}, out=${usage?.output_tokens})`
     );
 
-    // Wenn leer: detailliert loggen, was zurückkam
     if (!text) {
-      console.error(`[${label}] LEERE Antwort! finish_reason=${finishReason}`);
-      console.error(`[${label}] message-Objekt:`, JSON.stringify(choice?.message)?.slice(0, 500));
-      if (finishReason === 'length') {
-        console.error(`[${label}] → Token-Budget reicht nicht. Erhöhe maxTokens oder senke reasoning_effort.`);
+      console.error(`[${label}] LEERE Antwort! stop_reason=${stop}`);
+      console.error(`[${label}] content:`, JSON.stringify(response.content)?.slice(0, 500));
+      if (stop === 'max_tokens') {
+        console.error(`[${label}] → max_tokens war zu niedrig. Erhöhen.`);
       }
     }
-    return { text, elapsed, finishReason, raw: response };
+    return { text, elapsed, stop, raw: response };
   } catch (err) {
     const elapsed = Date.now() - started;
-    console.error(`[${label}] OpenAI-Fehler nach ${elapsed}ms:`, err.message || err);
+    console.error(`[${label}] Claude-Fehler nach ${elapsed}ms:`, err.message || err);
     if (err.status) console.error(`[${label}] Status:`, err.status);
-    if (err.response?.data) console.error(`[${label}] Detail:`, JSON.stringify(err.response.data).slice(0, 500));
+    if (err.error) console.error(`[${label}] Detail:`, JSON.stringify(err.error)?.slice(0, 500));
     throw err;
   }
 }
@@ -330,9 +336,11 @@ app.post('/api/analyze', async (req, res) => {
   const sizesKb = images.map((d) => Math.round((d.length * 0.75) / 1024));
   console.log(`[analyze] Session: ${sessionId}`);
   console.log(`[analyze] Profil: ${JSON.stringify(session.profile)}`);
-  console.log(`[analyze] Bilder empfangen: ${sizesKb.join('kb, ')}kb. Schicke an GPT-5...`);
+  console.log(`[analyze] Bilder empfangen: ${sizesKb.join('kb, ')}kb. Schicke an Claude (${MODEL})...`);
 
+  // Anthropic-Konvention: Bilder zuerst, dann Text-Anweisung
   const userContent = [
+    ...images.map(toImageBlock),
     {
       type: 'text',
       text:
@@ -365,19 +373,18 @@ app.post('/api/analyze', async (req, res) => {
         'Wenn das Kind quasi keine Fehler macht, gib trotzdem 2-3 für die Klassenstufe ' +
         'typische Kategorien zurück (mastery 70-85).',
     },
-    ...images.map(toImageBlock),
   ];
 
   try {
-    const { text } = await callOpenAI({
+    const { text } = await callClaude({
       label: 'analyze',
       systemPrompt:
         'Du bist eine erfahrene Deutschlehrkraft für alle Klassenstufen (1-13). ' +
         'Du analysierst Handschrift-Bilder und baust ein strukturiertes Fehlerprofil. ' +
         'Du passt deine Erwartungen an die angegebene Klassenstufe an. ' +
-        'Du antwortest IMMER ausschließlich mit gültigem JSON.',
+        'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent,
-      maxTokens: 12000,
+      maxTokens: 4000,
     });
 
     let parsed;
@@ -525,14 +532,14 @@ app.post('/api/next-exercise', async (req, res) => {
   );
 
   try {
-    const { text } = await callOpenAI({
+    const { text } = await callClaude({
       label: 'next-exercise',
       systemPrompt:
         'Du bist ein adaptiver Deutsch-Tutor für alle Klassenstufen (1-13). ' +
         'Du erstellst gezielte Rechtschreibübungen mit altersgerechten Erklärungen. ' +
-        'Du antwortest IMMER ausschließlich mit gültigem JSON.',
+        'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent: prompt,
-      maxTokens: 8000,
+      maxTokens: 2500,
     });
 
     let exercise;
@@ -633,21 +640,22 @@ app.post('/api/submit-exercise', async (req, res) => {
     '  ]\n' +
     '}';
 
+  // Anthropic-Konvention: Bild zuerst, dann Anweisungstext
   const userContent = [
-    { type: 'text', text: gradeText },
     toImageBlock(image),
+    { type: 'text', text: gradeText },
   ];
 
   let aiGrading = null;
   try {
-    const { text } = await callOpenAI({
+    const { text } = await callClaude({
       label: 'submit',
       systemPrompt:
         'Du bist ein strenger, aber kindgerechter deutscher Rechtschreiblehrer. ' +
         'Du liest Kinderhandschrift, bewertest präzise nach Feature und erkennst neue Fehlermuster. ' +
-        'Du antwortest IMMER ausschließlich mit gültigem JSON.',
+        'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent,
-      maxTokens: 8000,
+      maxTokens: 3000,
     });
     try {
       aiGrading = parseJsonResponse(text);
@@ -719,6 +727,6 @@ app.use((req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`\n[FehlerFix] ✏️  Server läuft auf http://localhost:${PORT}`);
-  console.log(`[FehlerFix] Modell: ${MODEL} (OpenAI)`);
+  console.log(`[FehlerFix] Modell: ${MODEL} (Anthropic Claude)`);
   console.log(`[FehlerFix] Architektur: Feature-Table-Memory + adaptive Gewichtung\n`);
 });

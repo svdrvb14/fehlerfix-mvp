@@ -629,7 +629,7 @@ async function runAnalysis() {
 
     startLoadingRotation();
     const controller = new AbortController();
-    // GPT-5 Reasoning kann bei Vision 3-8 Minuten dauern – großzügig timeout
+    // Claude antwortet meist in 20-60s, großzügig timeout für Spitzenlasten
     const timer = setTimeout(() => controller.abort(), 600000); // 10 min
     const res = await fetch('/api/analyze', {
       method: 'POST',
