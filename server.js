@@ -709,7 +709,11 @@ app.post('/api/submit-exercise', async (req, res) => {
   });
 });
 
-app.get('*', (req, res) => {
+// SPA-Fallback: alle nicht-API GETs → index.html.
+// Middleware-Form (statt app.get('*', ...)) ist robust gegen path-to-regexp-Versionen.
+app.use((req, res, next) => {
+  if (req.method !== 'GET') return next();
+  if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
