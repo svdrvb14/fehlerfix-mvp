@@ -530,11 +530,12 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
 //   .stop()
 //   .on('start' | 'pause' | 'resume' | 'end' | 'error', cb)
 // ─────────────────────────────────────────────────────────
-function createBrowserTTS({ lang = 'de-DE', rate = 0.7, pitch = 1.0 } = {}) {
+function createBrowserTTS({ lang = 'de-DE', rate = 0.55, pitch = 1.0 } = {}) {
   const listeners = {};
   const emit = (event, payload) => (listeners[event] || []).forEach((cb) => cb(payload));
   let utterance = null;
   let preferredVoice = null;
+  let onEndOnce = null; // exklusiver Callback für den nächsten end-Event (für Satz-Sequenz)
 
   function pickVoice() {
     if (preferredVoice) return preferredVoice;
@@ -576,7 +577,12 @@ function createBrowserTTS({ lang = 'de-DE', rate = 0.7, pitch = 1.0 } = {}) {
         utterance.onstart = () => emit('start');
         utterance.onpause = () => emit('pause');
         utterance.onresume = () => emit('resume');
-        utterance.onend = () => emit('end');
+        utterance.onend = () => {
+          const cb = onEndOnce;
+          onEndOnce = null;
+          emit('end');
+          if (cb) cb();
+        };
         utterance.onerror = (e) => emit('error', e);
         speechSynthesis.speak(utterance);
       } catch (err) {
@@ -595,6 +601,7 @@ function createBrowserTTS({ lang = 'de-DE', rate = 0.7, pitch = 1.0 } = {}) {
     stop() {
       if ('speechSynthesis' in window) speechSynthesis.cancel();
       utterance = null;
+      onEndOnce = null;
     },
 
     isSpeaking: () =>
@@ -603,6 +610,16 @@ function createBrowserTTS({ lang = 'de-DE', rate = 0.7, pitch = 1.0 } = {}) {
 
     on(event, cb) {
       (listeners[event] = listeners[event] || []).push(cb);
+    },
+
+    // Exklusiver Einmal-Callback für den nächsten end-Event (für Satz-Sequenz)
+    speakThen(text, cb) {
+      onEndOnce = cb;
+      this.speak(text);
+    },
+
+    setRate(newRate) {
+      rate = newRate;
     },
   };
 }
@@ -912,80 +929,142 @@ function renderExercise(exercise) {
   document.getElementById('btn-check').disabled = true;
 }
 
-// ─── Audio-Diktat-Player-Logik ───────────────────────
+// ─── Audio-Diktat-Player mit Satz-Navigation ────────
+// SpeechSynthesis kann nicht mitten im Satz scrubben → wir splitten den Text in Sätze
+// und steuern auf Satz-Ebene: Play/Pause, vorheriger/nächster Satz, aktuellen wiederholen.
+// Eine Mini-Timeline zeigt visuell, wo wir gerade sind (ohne den Text zu verraten).
+function splitIntoSentences(text) {
+  if (!text) return [];
+  return text
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+let dictation = null; // aktueller Player-State
+
 function resetDictationPlayerUI() {
-  const playBtn = document.getElementById('dictation-play');
-  const pauseBtn = document.getElementById('dictation-pause');
-  const replayBtn = document.getElementById('dictation-replay');
+  dictation = null;
   const status = document.getElementById('dictation-status');
-  if (!playBtn) return;
-  playBtn.style.display = '';
-  playBtn.textContent = '▶ Anhören';
-  pauseBtn.style.display = 'none';
-  pauseBtn.textContent = '⏸ Pause';
-  replayBtn.style.display = 'none';
-  status.classList.remove('is-speaking');
-  status.textContent = 'Klick auf „Anhören" – der Text wird langsam vorgelesen.';
+  if (status) {
+    status.textContent = 'Klick auf „Anhören" – der Text wird langsam vorgelesen.';
+    status.classList.remove('is-speaking');
+  }
+  document.querySelectorAll('.dictation-timeline')?.forEach((el) => el.remove());
 }
 
 function setupDictationPlayer(text) {
-  const playBtn = document.getElementById('dictation-play');
-  const pauseBtn = document.getElementById('dictation-pause');
-  const replayBtn = document.getElementById('dictation-replay');
   const status = document.getElementById('dictation-status');
+  const controlsRow = document.querySelector('#dictation-player .dictation-controls');
+  if (!controlsRow || !status) return;
 
   if (!tts.isSupported()) {
     status.textContent =
       'Dein Browser unterstützt keine Sprachausgabe. Bitte nutze Safari oder Chrome.';
-    playBtn.disabled = true;
     return;
   }
 
-  // Listener werden bei jeder Übung neu registriert – browser-tts dedupliziert nicht selbst,
-  // wir nutzen aber nur Single-Player-State, also OK.
-  function startPlayback() {
-    tts.speak(text);
-    status.classList.add('is-speaking');
-    status.textContent = 'Wird vorgelesen... schreib mit!';
-    playBtn.style.display = 'none';
-    pauseBtn.style.display = '';
-    pauseBtn.textContent = '⏸ Pause';
-    replayBtn.style.display = 'none';
+  const sentences = splitIntoSentences(text);
+  dictation = { sentences, idx: 0, playing: false };
+
+  // Controls komplett neu aufbauen
+  controlsRow.innerHTML = `
+    <button class="player-btn" id="dict-prev" aria-label="Vorheriger Satz" disabled>◀ Satz</button>
+    <button class="player-btn player-btn-main" id="dict-play">▶ Anhören</button>
+    <button class="player-btn" id="dict-replay" aria-label="Aktuellen Satz wiederholen">🔁 Satz</button>
+    <button class="player-btn" id="dict-next" aria-label="Nächster Satz">Satz ▶</button>
+  `;
+
+  // Timeline-Punkte (zeigt wo wir im Diktat sind – ohne den Text zu verraten)
+  let timeline = document.querySelector('#dictation-player .dictation-timeline');
+  if (!timeline) {
+    timeline = document.createElement('div');
+    timeline.className = 'dictation-timeline';
+    document.getElementById('dictation-player').appendChild(timeline);
+  }
+  timeline.innerHTML = sentences
+    .map((_, i) => `<button class="timeline-dot" data-idx="${i}" aria-label="Satz ${i + 1}"></button>`)
+    .join('');
+  timeline.querySelectorAll('.timeline-dot').forEach((dot) => {
+    dot.addEventListener('click', () => jumpTo(parseInt(dot.dataset.idx, 10)));
+  });
+
+  function updateUI() {
+    const playBtn = document.getElementById('dict-play');
+    const prevBtn = document.getElementById('dict-prev');
+    const nextBtn = document.getElementById('dict-next');
+    if (!playBtn) return;
+    playBtn.textContent = dictation.playing ? '⏸ Pause' : '▶ Anhören';
+    prevBtn.disabled = dictation.idx <= 0;
+    nextBtn.disabled = dictation.idx >= sentences.length - 1;
+
+    // Timeline-Markierung
+    timeline.querySelectorAll('.timeline-dot').forEach((dot, i) => {
+      dot.classList.toggle('active', i === dictation.idx);
+      dot.classList.toggle('done', i < dictation.idx);
+    });
+
+    if (dictation.playing) {
+      status.classList.add('is-speaking');
+      status.textContent = `Satz ${dictation.idx + 1} von ${sentences.length} – wird vorgelesen, schreib mit!`;
+    } else {
+      status.classList.remove('is-speaking');
+      status.textContent = `Bereit bei Satz ${dictation.idx + 1} von ${sentences.length}. Klick „Anhören".`;
+    }
   }
 
-  playBtn.onclick = startPlayback;
+  function playCurrent() {
+    const s = sentences[dictation.idx];
+    if (!s) return;
+    tts.stop();
+    dictation.playing = true;
+    updateUI();
+    tts.speakThen(s, () => {
+      // Auto-advance zum nächsten Satz
+      if (!dictation) return;
+      if (dictation.idx < sentences.length - 1) {
+        dictation.idx++;
+        playCurrent();
+      } else {
+        dictation.playing = false;
+        status.classList.remove('is-speaking');
+        status.textContent = `Fertig. Du kannst einzelne Sätze zurückspulen und nochmal hören.`;
+        updateUI();
+      }
+    });
+  }
 
-  pauseBtn.onclick = () => {
-    if (tts.isPaused()) {
-      tts.resume();
-      pauseBtn.textContent = '⏸ Pause';
-      status.textContent = 'Wird vorgelesen... schreib mit!';
-      status.classList.add('is-speaking');
+  function jumpTo(i) {
+    if (!dictation) return;
+    tts.stop();
+    dictation.idx = Math.max(0, Math.min(sentences.length - 1, i));
+    dictation.playing = false;
+    playCurrent();
+  }
+
+  document.getElementById('dict-play').onclick = () => {
+    if (dictation.playing) {
+      tts.stop();
+      dictation.playing = false;
+      updateUI();
     } else {
-      tts.pause();
-      pauseBtn.textContent = '▶ Weiter';
-      status.textContent = 'Pausiert. Klick auf „Weiter".';
-      status.classList.remove('is-speaking');
+      playCurrent();
     }
   };
+  document.getElementById('dict-prev').onclick = () => jumpTo(dictation.idx - 1);
+  document.getElementById('dict-next').onclick = () => jumpTo(dictation.idx + 1);
+  document.getElementById('dict-replay').onclick = () => jumpTo(dictation.idx);
 
-  replayBtn.onclick = startPlayback;
-
-  // Globale TTS-Events steuern UI
-  tts.on('end', () => {
-    if (!document.getElementById('screen-exercise').classList.contains('active')) return;
-    pauseBtn.style.display = 'none';
-    playBtn.style.display = 'none';
-    replayBtn.style.display = '';
-    status.classList.remove('is-speaking');
-    status.textContent = 'Fertig vorgelesen. Du kannst nochmal hören, wenn du willst.';
-  });
+  updateUI();
 
   tts.on('error', () => {
     status.textContent = 'Sprachausgabe ging gerade nicht. Versuch es nochmal.';
     status.classList.remove('is-speaking');
-    playBtn.style.display = '';
-    pauseBtn.style.display = 'none';
+    if (dictation) {
+      dictation.playing = false;
+      updateUI();
+    }
   });
 }
 

@@ -845,6 +845,41 @@ body {
 .player-btn-main:hover {
   background: var(--blue-medium);
 }
+.player-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mini-Timeline: ein Punkt pro Satz, ohne den Text zu verraten */
+.dictation-timeline {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  padding: 6px 0;
+}
+.timeline-dot {
+  width: 28px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(91, 141, 184, 0.25);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.timeline-dot.done {
+  background: var(--blue-medium);
+}
+.timeline-dot.active {
+  background: var(--coral);
+  width: 44px;
+}
+.timeline-dot:hover {
+  transform: scaleY(1.4);
+}
 
 .ex-content {
   margin-bottom: 22px;

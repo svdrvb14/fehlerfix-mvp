@@ -178,15 +178,13 @@
             <h2 class="task-title" id="ex-instruction">...</h2>
             <div class="display-text" id="ex-display-text"></div>
 
-            <!-- Audio-Diktat-Player: nur sichtbar bei type="audio_dictation" -->
+            <!-- Audio-Diktat-Player: nur sichtbar bei type="audio_dictation".
+                 Controls werden dynamisch von setupDictationPlayer() befüllt
+                 (mit Satz-Navigation + Mini-Timeline). -->
             <div class="dictation-player" id="dictation-player" style="display:none">
               <div class="dictation-icon" aria-hidden="true">🎧</div>
               <div class="dictation-status" id="dictation-status">Klick auf „Anhören" – der Text wird langsam vorgelesen.</div>
-              <div class="dictation-controls">
-                <button class="player-btn player-btn-main" id="dictation-play">▶ Anhören</button>
-                <button class="player-btn" id="dictation-pause" style="display:none">⏸ Pause</button>
-                <button class="player-btn" id="dictation-replay" style="display:none">↻ Nochmal hören</button>
-              </div>
+              <div class="dictation-controls"></div>
             </div>
           </div>
 

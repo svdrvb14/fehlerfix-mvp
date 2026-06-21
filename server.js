@@ -504,10 +504,13 @@ app.post('/api/next-exercise', async (req, res) => {
   weighted.sort((a, b) => b.practice_weight - a.practice_weight);
 
   // ── ADAPTIVE FEATURE-WAHL: EIN Feature pro Übung ─────
-  // Höchste practice_weight = höchster Übungsbedarf.
-  // Wahl-Logik: bei "poor" beim alten Feature bleiben, sonst Top-Feature.
+  // Regel:
+  //  - Erste 3 Übungen: GARANTIERT auf Top-Feature (häufigster Fehler aus den Onboarding-Texten)
+  //  - Danach: bei "poor" beim alten Feature bleiben, sonst neu Top-Feature
   let focusFeature;
-  if (session.lastExercisePerformance === 'poor' && session.lastFocusFeature) {
+  if (session.exercisesCompleted < 3) {
+    focusFeature = weighted[0]?.name;
+  } else if (session.lastExercisePerformance === 'poor' && session.lastFocusFeature) {
     focusFeature = session.lastFocusFeature;
   } else {
     focusFeature = weighted[0]?.name;
@@ -521,25 +524,43 @@ app.post('/api/next-exercise', async (req, res) => {
 
   const typeDescriptions = {
     cloze_text:
-      'LÜCKENTEXT: Erstelle einen zusammenhängenden kurzen Text (3-5 Sätze) mit Lücken "___" ' +
-      'genau an den Stellen, wo das Fokus-Feature greift. Die Schülerin/der Schüler schreibt ' +
-      'den Text handschriftlich ab und füllt dabei die Lücken. ' +
-      'Lücken sind nur "___" (drei Unterstriche). Reihenfolge der ___ = Reihenfolge der Feature-Vorkommen. ' +
-      'Lücken betreffen NUR den Feature-Teil eines Wortes (z.B. "T___ger" statt komplettem "___"). ' +
-      'instruction: "Schreibe den Text ab und fülle die Lücken."',
+      'LÜCKENTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (3-5 Sätze, eine kleine ' +
+      'Geschichte / Beobachtung mit rotem Faden) mit 2-4 Lücken "___".\n' +
+      'STRENGE LÜCKEN-REGELN:\n' +
+      '- Lücken dürfen NUR Buchstabengruppen ersetzen, wo das Fokus-Feature die Schreibung ' +
+      'verwirrend macht (z.B. "ie" in "T___ger" → "Tier", oder "ss" in "Stra___e" → "Straße").\n' +
+      '- VERBOTEN: Lücken auf Satzzeichen, Bindestrichen, Apostrophen, Anführungszeichen, ' +
+      'Leerzeichen, Zahlen oder ganzen Wörtern. NIEMALS so etwas wie "Start___Ups" wo die ' +
+      'Lücke der Bindestrich wäre – das ist kein Rechtschreibproblem.\n' +
+      '- Lücken müssen ECHTE Verwechslungsstellen sein, die die Klassenstufe wirklich falsch ' +
+      'machen würde.\n' +
+      '- Reihenfolge der ___ = Reihenfolge der Feature-Vorkommen.\n' +
+      'instruction-Beispiel: "Schreibe den Text ab und fülle die Lücken."',
+
     error_text:
-      'FEHLERTEXT: Erstelle einen zusammenhängenden kurzen Text (3-5 Sätze) mit 2-4 eingebauten ' +
-      'Rechtschreibfehlern – ALLE zum Fokus-Feature. Alle anderen Wörter sind korrekt. ' +
-      'Die Schülerin/der Schüler schreibt den Text in der KORREKTEN Form handschriftlich ab. ' +
-      'instruction: "In diesem Text sind ein paar Fehler. Schreibe ihn richtig ab."',
+      'FEHLERTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (3-5 Sätze, kleine ' +
+      'Geschichte mit Sinn) mit 2-4 eingebauten Rechtschreibfehlern – ALLE zum Fokus-Feature.\n' +
+      'STRENGE REGELN:\n' +
+      '- Fehler nur in echten Wörtern, NIEMALS Satzzeichen weglassen/verschieben.\n' +
+      '- Fehler müssen authentisch sein – Verwechslungen, die Lerner dieser Klassenstufe ' +
+      'wirklich machen (z.B. "Tir" statt "Tier", nicht künstliche Fantasiefehler).\n' +
+      '- Alle anderen Wörter im Text sind 100% korrekt geschrieben.\n' +
+      '- Die Schülerin/der Schüler schreibt den korrigierten Text handschriftlich ab.\n' +
+      'instruction-Beispiel: "In diesem Text sind ein paar Fehler. Schreibe ihn richtig ab."',
+
     audio_dictation:
-      'AUDIO-DIKTAT: Erstelle einen zusammenhängenden, kurzen, KORREKT geschriebenen Text (3-5 Sätze). ' +
-      'Der Text wird per Sprachausgabe LANGSAM VORGELESEN – die Schülerin/der Schüler hört zu und ' +
-      'schreibt mit. Der Text enthält 2-4 Vorkommen des Fokus-Features (klar hörbar, aber rechtschreiblich ' +
-      'eine Herausforderung). KEINE Lücken, KEINE Fehler. ' +
-      'WICHTIG: Setze displayText auf einen leeren String "" – der Text wird nicht angezeigt, nur vorgelesen. ' +
-      'Achte darauf, dass der Text gut sprechbar ist (keine komplizierten Abkürzungen, Zahlen etc.). ' +
-      'instruction: "Hör gut zu und schreibe auf, was du hörst."',
+      'AUDIO-DIKTAT: Erstelle einen ZUSAMMENHÄNGENDEN, kurzen, vollständig KORREKTEN Text ' +
+      '(3-5 Sätze, kleine Geschichte mit Sinn).\n' +
+      'STRENGE REGELN:\n' +
+      '- Text wird per Sprachausgabe langsam vorgelesen, das Kind schreibt mit.\n' +
+      '- Text enthält 2-4 Wörter, in denen das Fokus-Feature vorkommt (klar hörbar, aber ' +
+      'rechtschreiblich eine Herausforderung).\n' +
+      '- KEINE Lücken, KEINE Fehler, KEINE Sonderzeichen außer normale Satzzeichen.\n' +
+      '- KEINE Anführungszeichen, KEINE Bindestrich-Komposita ("Start-Ups"), KEINE Abkürzungen, ' +
+      'KEINE Zahlen, KEINE Aufzählungen, KEINE Fremdwörter.\n' +
+      '- Text muss FLÜSSIG vorlesbar sein – natürlicher Sprachfluss.\n' +
+      '- Setze displayText auf einen leeren String "".\n' +
+      'instruction-Beispiel: "Hör gut zu und schreibe auf, was du hörst."',
   };
 
   const prompt =
@@ -560,13 +581,22 @@ app.post('/api/next-exercise', async (req, res) => {
     '- Bei letzter Performance "good"  → mach die Übung etwas SCHWERER (längere/seltenere Wörter).\n' +
     '- Bei letzter Performance "poor"  → mach sie EINFACHER (kürzere/häufigere Wörter).\n' +
     '- Bei "medium" oder keiner Historie → mittleres Niveau.\n\n' +
-    `ÜBUNGSTYP FÜR DIESE ÜBUNG (fest vorgegeben): "${exType}"\n\n` +
+    `ÜBUNGSTYP FÜR DIESE ÜBUNG (fest vorgegeben): "${exType}"\n` +
+    `FOKUS-FEATURE FÜR DIESE ÜBUNG (fest vorgegeben): "${focusFeature}"\n` +
+    `Diese Übung trainiert AUSSCHLIESSLICH dieses eine Feature. Keine anderen Themen.\n\n` +
     typeDescriptions[exType] + '\n\n' +
-    'KRITISCHE REGELN:\n' +
-    '- Die Aufgabenstellung (instruction) darf NIEMALS die Lösung verraten. ' +
-    'Erwähne NIE konkrete Wörter, um die es geht. Schlechtes Beispiel: "Wie schreibt man Zoo-Tier?".\n' +
-    '- Der Text ist eine kleine Geschichte oder Beobachtung, 3-5 Sätze, altersgerecht, abwechslungsreich.\n' +
-    '- Genau der oben genannte Übungstyp – KEIN anderer.\n\n' +
+    'GLOBAL KRITISCHE REGELN (gelten IMMER):\n' +
+    '- Aufgabenstellung (instruction) darf NIEMALS die Lösung verraten. ' +
+    'Erwähne NIE konkrete Wörter aus dem Text. Schlechtes Beispiel: "Wie schreibt man Zoo-Tier?".\n' +
+    '- Der Text MUSS eine kohärente kleine Geschichte oder Beobachtung sein. ' +
+    'Sätze nehmen aufeinander Bezug, keine zusammenhanglosen Einzelsätze.\n' +
+    '- Wortschatz und Komplexität GENAU passend zur Klassenstufe.\n' +
+    '- KEINE englischen Begriffe, KEINE Anglizismen, KEINE Bindestrich-Komposita ("Start-Ups", ' +
+    '"E-Mail", "Hands-On") – die machen rechtschreiblich keinen Sinn als Übung.\n' +
+    '- KEINE Eigennamen mit Sonderschreibung (z.B. "iPhone", "McDonald\'s") – nur deutsche ' +
+    'Alltagswörter, die ein Schüler dieser Klasse aktiv schreiben sollte.\n' +
+    '- Vor der finalen Antwort PRÜFE selbst: Würde ein Lehrer diese Übung im Heft akzeptieren? ' +
+    'Wenn nein, formuliere um.\n\n' +
     'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
     '{\n' +
     `  "type": "${exType}",\n` +
@@ -606,13 +636,17 @@ app.post('/api/next-exercise', async (req, res) => {
       console.warn(`[next-exercise] KI lieferte Typ "${exercise.type}", erzwinge "${exType}".`);
       exercise.type = exType;
     }
+    // Das vorgegebene Fokus-Feature erzwingen (Server-side Truth)
+    if (exercise.focusFeature !== focusFeature) {
+      console.warn(`[next-exercise] KI lieferte Fokus "${exercise.focusFeature}", erzwinge "${focusFeature}".`);
+      exercise.focusFeature = focusFeature;
+    }
     // Bei audio_dictation: displayText immer leer halten (sonst sieht das Kind den Text)
     if (exType === 'audio_dictation') {
       exercise.displayText = '';
     }
 
-    const focus = exercise.focusFeature || exercise.focusCategory;
-    if (focus) session.lastFocusFeature = focus;
+    session.lastFocusFeature = focusFeature;
     session.lastExercise = exercise;
 
     console.log(
