@@ -276,55 +276,96 @@ function toImageBlock(dataUrl) {
  * Wrapper für Claude-Calls. Liefert den Antwort-String und loggt Dauer + Tokens.
  * userContent kann ein String ODER ein Array aus text/image-Blöcken sein.
  */
-async function callClaude({ label, systemPrompt, userContent, maxTokens = 4000 }) {
+/**
+ * Erkennt transiente Netzwerk-Fehler, bei denen ein Retry sinnvoll ist.
+ * (Premature close, ECONNRESET, fetch failed, 5xx, 429 Rate-Limit)
+ */
+function isRetryableError(err) {
+  if (!err) return false;
+  const msg = String(err.message || '').toLowerCase();
+  if (
+    msg.includes('premature close') ||
+    msg.includes('econnreset') ||
+    msg.includes('fetch failed') ||
+    msg.includes('socket hang up') ||
+    msg.includes('etimedout') ||
+    msg.includes('network') ||
+    msg.includes('connection')
+  ) return true;
+  const s = err.status;
+  return s === 429 || (s >= 500 && s < 600);
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function callClaude({ label, systemPrompt, userContent, maxTokens = 4000, maxRetries = 3 }) {
   if (!anthropic) {
     const e = new Error('ANTHROPIC_API_KEY ist nicht gesetzt – bitte in .env eintragen und Server neu starten.');
     e.status = 500;
     throw e;
   }
-  const started = Date.now();
-  try {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: typeof userContent === 'string'
-            ? [{ type: 'text', text: userContent }]
-            : userContent,
-        },
-      ],
-    });
-    const elapsed = Date.now() - started;
-    const text = (response.content || [])
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text)
-      .join('\n');
-    const stop = response.stop_reason;
-    const usage = response.usage;
 
-    console.log(
-      `[${label}] Claude-Antwort nach ${elapsed}ms (${text.length} chars, stop=${stop}, ` +
-        `tokens: in=${usage?.input_tokens}, out=${usage?.output_tokens})`
-    );
+  let lastErr;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const started = Date.now();
+    try {
+      const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: typeof userContent === 'string'
+              ? [{ type: 'text', text: userContent }]
+              : userContent,
+          },
+        ],
+      });
+      const elapsed = Date.now() - started;
+      const text = (response.content || [])
+        .filter((c) => c.type === 'text')
+        .map((c) => c.text)
+        .join('\n');
+      const stop = response.stop_reason;
+      const usage = response.usage;
 
-    if (!text) {
-      console.error(`[${label}] LEERE Antwort! stop_reason=${stop}`);
-      console.error(`[${label}] content:`, JSON.stringify(response.content)?.slice(0, 500));
-      if (stop === 'max_tokens') {
-        console.error(`[${label}] → max_tokens war zu niedrig. Erhöhen.`);
+      console.log(
+        `[${label}] Claude-Antwort nach ${elapsed}ms` +
+          (attempt > 1 ? ` (Versuch ${attempt})` : '') +
+          ` (${text.length} chars, stop=${stop}, ` +
+          `tokens: in=${usage?.input_tokens}, out=${usage?.output_tokens})`
+      );
+
+      if (!text) {
+        console.error(`[${label}] LEERE Antwort! stop_reason=${stop}`);
+        console.error(`[${label}] content:`, JSON.stringify(response.content)?.slice(0, 500));
+        if (stop === 'max_tokens') {
+          console.error(`[${label}] → max_tokens war zu niedrig. Erhöhen.`);
+        }
       }
+      return { text, elapsed, stop, raw: response };
+    } catch (err) {
+      const elapsed = Date.now() - started;
+      lastErr = err;
+      const retryable = isRetryableError(err);
+      console.error(
+        `[${label}] Claude-Fehler nach ${elapsed}ms (Versuch ${attempt}/${maxRetries}):`,
+        err.message || err
+      );
+      if (err.status) console.error(`[${label}] Status:`, err.status);
+      if (err.error) console.error(`[${label}] Detail:`, JSON.stringify(err.error)?.slice(0, 500));
+
+      if (!retryable || attempt === maxRetries) {
+        throw err;
+      }
+      // Exponential Backoff: 1s, 2s, 4s
+      const wait = 1000 * Math.pow(2, attempt - 1);
+      console.warn(`[${label}] → Retry in ${wait}ms (Fehler ist transient: ${err.message})`);
+      await sleep(wait);
     }
-    return { text, elapsed, stop, raw: response };
-  } catch (err) {
-    const elapsed = Date.now() - started;
-    console.error(`[${label}] Claude-Fehler nach ${elapsed}ms:`, err.message || err);
-    if (err.status) console.error(`[${label}] Status:`, err.status);
-    if (err.error) console.error(`[${label}] Detail:`, JSON.stringify(err.error)?.slice(0, 500));
-    throw err;
   }
+  throw lastErr;
 }
 
 // ─────────────────────────────────────────────────────────────
