@@ -77,9 +77,9 @@ const MODAL_CONTENT = {
 
       <h3>Anbieter</h3>
       <p>
-        Salvador Elsen<br>
+        Business@School Team Leibnizschule<br>
         – Schülerprojekt FehlerFix –<br>
-        Kontakt: s_elsen@icloud.com
+        Kontakt: contact.temfehlerfix@gmail.com
       </p>
 
       <h3>Hinweis</h3>
