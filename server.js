@@ -31,9 +31,19 @@ const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
 // Modell-Auswahl über ENV. Default: Sonnet 4.6 (schnell + günstig).
 // Für Opus: CLAUDE_MODEL=claude-opus-4-8 setzen (im Render-Dashboard, kein Redeploy nötig).
-const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
+// Sicherheits-Check gegen Tippfehler in der ENV-Variable: muss mit "claude-" beginnen.
+const ENV_MODEL = (process.env.CLAUDE_MODEL || '').trim();
+const MODEL = /^claude-/i.test(ENV_MODEL) ? ENV_MODEL : DEFAULT_MODEL;
+if (ENV_MODEL && ENV_MODEL !== MODEL) {
+  console.error(
+    `\n[FehlerFix] ⚠️  CLAUDE_MODEL="${ENV_MODEL}" sieht falsch aus (muss mit "claude-" anfangen).`
+  );
+  console.error(`[FehlerFix] Fallback auf "${DEFAULT_MODEL}".\n`);
+}
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error('\n[FehlerFix] ⚠️  ANTHROPIC_API_KEY ist nicht gesetzt!');
