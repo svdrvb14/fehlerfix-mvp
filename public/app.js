@@ -26,6 +26,114 @@ document.addEventListener('selectstart', (e) => {
   e.preventDefault();
 });
 
+// ─────────────────────────────────────────────────────────
+// Top-Navigation: Brand → Home, Anleitung/Über uns/Impressum → Modals
+// ─────────────────────────────────────────────────────────
+const MODAL_CONTENT = {
+  anleitung: {
+    title: 'So funktioniert FehlerFix',
+    html: `
+      <h3>1. Erzähl uns kurz von dir</h3>
+      <p>Du gibst deine Klassenstufe und Schulform an. So passen wir die Aufgaben genau auf dein Niveau an.</p>
+
+      <h3>2. Schreib uns drei kurze Texte</h3>
+      <p>Drei freie Texte zu verschiedenen Themen, ganz handschriftlich auf dem Notizbuch im Bildschirm.</p>
+
+      <h3>3. Die KI baut dein Übungsprogramm</h3>
+      <p>Wir lesen deine Schrift, finden Muster, wo es noch unsicher ist, und stellen daraus ein persönliches Übungsprogramm zusammen.</p>
+
+      <h3>4. Üben – mit Stift, nicht mit Tastatur</h3>
+      <p>Jede Übung schreibst du handschriftlich ab. Es gibt drei Arten:</p>
+      <ul>
+        <li><strong>Lückentext</strong> – Text abschreiben und Lücken füllen</li>
+        <li><strong>Fehlertext</strong> – Fehler finden und richtig abschreiben</li>
+        <li><strong>Audio-Diktat</strong> – langsam vorgelesener Text mitschreiben</li>
+      </ul>
+
+      <h3>5. Verstehen statt nur korrigieren</h3>
+      <p>Nach jeder Übung siehst du, was gut war und was wir nochmal üben. Du bekommst nicht nur die richtige Lösung, sondern auch die kindgerechte Erklärung dahinter.</p>
+    `,
+  },
+  ueber: {
+    title: 'Über FehlerFix',
+    html: `
+      <h3>Schreib. Versteh. Verbessere.</h3>
+      <p>FehlerFix ist eine adaptive Lern-App für Rechtschreibung. Unser USP: Wir korrigieren nicht nur Fehler – wir erklären, <em>warum</em> ein Wort so geschrieben wird, und wir generieren personalisierte Übungen, die genau zu den Mustern passen, die du im echten Schreiben zeigst.</p>
+
+      <h3>Warum handschriftlich?</h3>
+      <p>Studien zeigen: Wer mit Stift schreibt, lernt Rechtschreibung tiefer als am Keyboard. Außerdem fördert es die Feinmotorik. Deshalb ist FehlerFix bewusst <strong>keine Multiple-Choice-App</strong>, sondern eine motorisch fördernde Lern-App.</p>
+
+      <h3>Wie wir das machen</h3>
+      <p>Im Hintergrund läuft ein adaptives Modell mit einer wachsenden „Feature-Table" für jeden Lerner – jede Übung schärft das Bild davon, wo du stehst. Die KI von Anthropic Claude liest deine Handschrift und erkennt nicht nur Tippfehler, sondern echte Muster im Rechtschreibverhalten.</p>
+
+      <h3>Status</h3>
+      <p>FehlerFix befindet sich aktuell als MVP im Test. Wir entwickeln das Projekt im Rahmen eines Schulwettbewerbs (Deutschlandfinale) weiter.</p>
+    `,
+  },
+  impressum: {
+    title: 'Impressum',
+    html: `
+      <p>Angaben gemäß § 5 TMG / DSG-VO</p>
+
+      <h3>Anbieter</h3>
+      <p>
+        Salvador Elsen<br>
+        – Schülerprojekt FehlerFix –<br>
+        Kontakt: s_elsen@icloud.com
+      </p>
+
+      <h3>Hinweis</h3>
+      <p>Diese Anwendung ist ein nicht-kommerzielles Schulprojekt (MVP). Sie wird ausschließlich zu Lern- und Demonstrationszwecken im Rahmen eines Wettbewerbs betrieben.</p>
+
+      <h3>Datenverarbeitung</h3>
+      <p>Während der Nutzung werden handgeschriebene Texte an die Anthropic API (Claude) übertragen, um sie auszuwerten. Es findet keine dauerhafte Speicherung der Texte oder Bilder statt – Sessions werden nur im Arbeitsspeicher des Servers gehalten und beim Neustart gelöscht.</p>
+
+      <h3>Haftungsausschluss</h3>
+      <p>Die Inhalte und Bewertungen werden durch eine KI generiert und können fehlerhaft sein. Es besteht kein Anspruch auf Korrektheit der Korrekturen oder Erklärungen.</p>
+
+      <div class="impressum-block">
+        Bei einem späteren produktiven Einsatz werden die Pflichtangaben (vollständige Anschrift, V.i.S.d.P., Datenschutzerklärung) entsprechend ergänzt.
+      </div>
+    `,
+  },
+};
+
+function openModal(key) {
+  const cfg = MODAL_CONTENT[key];
+  if (!cfg) return;
+  document.getElementById('modal-title').textContent = cfg.title;
+  document.getElementById('modal-body').innerHTML = cfg.html;
+  const modal = document.getElementById('modal');
+  modal.hidden = false;
+  modal.scrollTop = 0;
+  // Body-Scroll sperren, solange Modal offen ist
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  document.getElementById('modal').hidden = true;
+  document.body.style.overflow = '';
+}
+
+// Alle Buttons mit data-modal öffnen das passende Modal
+document.querySelectorAll('[data-modal]').forEach((btn) => {
+  btn.addEventListener('click', () => openModal(btn.dataset.modal));
+});
+// Schließen via X-Button oder Backdrop
+document.querySelectorAll('[data-close-modal]').forEach((el) => {
+  el.addEventListener('click', closeModal);
+});
+// Escape-Taste schließt
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('modal').hidden) closeModal();
+});
+
+// Brand "FehlerFix" klick → Startseite (Welcome)
+document.getElementById('nav-home').addEventListener('click', () => {
+  // Falls TTS noch läuft (Audio-Diktat), stoppen
+  if (typeof tts !== 'undefined' && tts) tts.stop();
+  showScreen('welcome');
+});
+
 // Themen-Pool zur Datenerhebung (Onboarding).
 // Jedes Thema hat einen "levels"-Tag, damit wir altersangemessen filtern:
 //   "primary"   = Grundschule (Klasse 1-4)
