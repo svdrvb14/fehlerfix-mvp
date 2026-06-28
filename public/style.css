@@ -1247,6 +1247,36 @@ body {
   font-style: italic;
   font-size: 0.95rem;
 }
+
+/* FRESCH-Strategie-Tag pro Wort-Korrektur */
+.fresch-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.fresch-tag-schwingen {
+  background: #dce8f5;
+  color: #2c5d8f;
+}
+.fresch-tag-verlängern,
+.fresch-tag-verlangern {
+  background: #fde9e7;
+  color: #a8423d;
+}
+.fresch-tag-ableiten {
+  background: #fff4d6;
+  color: #8a6d1a;
+}
+.fresch-tag-merken {
+  background: #e6f4e8;
+  color: #2a6c34;
+}
 .explanation-card {
   background: var(--blue-soft);
   border-radius: 14px;

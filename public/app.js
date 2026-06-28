@@ -1228,18 +1228,23 @@ function renderProgress(data) {
 
   if (corrections.length) {
     correctionsEl.innerHTML = corrections
-      .map(
-        (c) => `
+      .map((c) => {
+        const strategy = c.fresch_strategy ? escapeHtml(c.fresch_strategy) : '';
+        const strategyTag = strategy
+          ? `<span class="fresch-tag fresch-tag-${strategy.toLowerCase().replace(/[^a-zä]/g, '')}">FRESCH · ${strategy}</span>`
+          : '';
+        return `
           <div class="word-correction">
             <div class="word-correction-row">
               <span class="word-wrong">${escapeHtml(c.wrong)}</span>
               <span class="word-arrow">→</span>
               <span class="word-correct">${escapeHtml(c.correct)}</span>
+              ${strategyTag}
             </div>
             ${c.explanation ? `<p class="word-explanation">${escapeHtml(c.explanation)}</p>` : ''}
           </div>
-        `
-      )
+        `;
+      })
       .join('');
     badCard.style.display = '';
   } else {

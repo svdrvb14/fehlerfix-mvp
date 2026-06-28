@@ -31,9 +31,11 @@ const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai
 
 // Modulare Erweiterungs-Architektur:
 //   - Sprach-Module (mehrsprachig vorbereitet, aktuell nur Deutsch aktiv)
-//   - Curriculum-Slot (Lehrwerks-Daten kommen später via Partner)
+//   - Curriculum-Slot (echte Daten: Hessen; weitere Bundesländer kommen via Partner)
+//   - Lernmethoden (aktuell: FRESCH für Deutsch)
 const { getLanguage, DEFAULT_LANGUAGE } = require('./lib/languages');
 const { curriculumPromptBlock } = require('./lib/curriculum');
+const { freschMethodPromptBlock } = require('./lib/methods/fresch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -89,6 +91,8 @@ app.get('/api/health', (req, res) => {
     provider: 'anthropic',
     model: MODEL,
     languages: listLanguages(),
+    curriculumStates: ['HE'],
+    methods: ['FRESCH'],
     time: new Date().toISOString(),
   });
 });
@@ -171,11 +175,21 @@ function profileToPromptBlock(profile) {
 }
 
 /**
- * Baut den kompletten Kontext-Block für die KI: Profil + Curriculum + ggf. Sprach-Hinweise.
+ * Baut den kompletten Kontext-Block für die KI: Profil + Curriculum + Methodik.
  * Wird in allen Prompts genutzt – eine zentrale Stelle, sauber erweiterbar.
+ * Für Deutsch wird zusätzlich die FRESCH-Methodik mitgegeben.
  */
 function buildContextBlock(profile) {
-  return profileToPromptBlock(profile) + '\n' + curriculumPromptBlock(profile);
+  const blocks = [
+    profileToPromptBlock(profile),
+    curriculumPromptBlock(profile),
+  ];
+  // FRESCH ist eine deutsche Rechtschreibmethode – nur bei Sprache "de"
+  const lang = profile?.language || DEFAULT_LANGUAGE;
+  if (lang === 'de') {
+    blocks.push(freschMethodPromptBlock());
+  }
+  return blocks.join('\n');
 }
 
 // Debug: Liste aller aktiven Sessions mit Kurz-Zusammenfassung
@@ -738,7 +752,10 @@ app.post('/api/submit-exercise', async (req, res) => {
     '7) Gib einen overall_score 0-100 für diese Übung.\n\n' +
     'WICHTIG word_corrections: Jedes Wort, das die Schülerin/der Schüler falsch geschrieben hat, ' +
     'kommt als eigener Eintrag in die Liste – mit der korrekten Schreibweise und einer kindgerechten, ' +
-    'altersangemessenen Erklärung (1-2 Sätze, das WARUM, keine Trockenheit). KEINE Sammelfeedbacks. ' +
+    'altersangemessenen Erklärung. Die Erklärung MUSS die FRESCH-Strategie (Schwingen / Verlängern / ' +
+    'Ableiten / Merken) explizit nennen und am konkreten Wort vorführen. ' +
+    'Beispiel-Erklärung (Verlängern): „Verlängere das Wort: Berg → die Berge. Du hörst das g am Ende, ' +
+    'also schreibst du Berg mit g, nicht mit k." KEINE generischen Tipps. ' +
     'Wenn alles richtig war: leere Liste.\n\n' +
     'WICHTIG mastery: Bei hoher Korrektheit (alles richtig) +15-25 Punkte, bei vielen Fehlern -15-25 Punkte. ' +
     'Bei teilweisem Erfolg moderat.\n\n' +
@@ -749,7 +766,9 @@ app.post('/api/submit-exercise', async (req, res) => {
     '  "summary_good": ["kurze, motivierende Sätze, was gut war"],\n' +
     '  "word_corrections": [\n' +
     '    { "wrong": "<falsch geschriebenes Wort>", "correct": "<richtige Schreibweise>", ' +
-    '"explanation": "<altersgerechte 1-2-Satz-Erklärung, warum so>", "feature": "<Feature-Name>" }\n' +
+    '"fresch_strategy": "Schwingen" | "Verlängern" | "Ableiten" | "Merken", ' +
+    '"explanation": "<altersgerechte Erklärung, die die FRESCH-Strategie am Wort vorführt>", ' +
+    '"feature": "<Feature-Name aus Memory oder neu>" }\n' +
     '  ],\n' +
     '  "results": [\n' +
     '    { "feature":"<exakter Name aus Memory>", "right":N, "wrong":N, "feedback":"...", "new_mastery":0-100 }\n' +
