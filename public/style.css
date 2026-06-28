@@ -476,6 +476,20 @@ body {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
 }
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.profile-hint {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: var(--blue-soft);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: var(--blue-medium);
+  font-weight: 500;
+}
 .choice-btn {
   background: white;
   border: 2px solid var(--border);
@@ -509,6 +523,9 @@ body {
   }
   .school-grid {
     grid-template-columns: 1fr;
+  }
+  .state-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

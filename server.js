@@ -29,6 +29,12 @@ const express = require('express');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai/sdk');
 
+// Modulare Erweiterungs-Architektur:
+//   - Sprach-Module (mehrsprachig vorbereitet, aktuell nur Deutsch aktiv)
+//   - Curriculum-Slot (Lehrwerks-Daten kommen später via Partner)
+const { getLanguage, DEFAULT_LANGUAGE } = require('./lib/languages');
+const { curriculumPromptBlock } = require('./lib/curriculum');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -76,11 +82,13 @@ app.use((req, res, next) => {
 
 // Health-Endpoint
 app.get('/api/health', (req, res) => {
+  const { listLanguages } = require('./lib/languages');
   res.json({
     ok: true,
     apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     provider: 'anthropic',
     model: MODEL,
+    languages: listLanguages(),
     time: new Date().toISOString(),
   });
 });
@@ -116,8 +124,25 @@ function getSession(sessionId) {
   return sessions[sessionId];
 }
 
+// Normalisiert das Profil: Klasse 1-4 wird immer als Grundschule behandelt,
+// fehlende Sprache → Default. Hier zentralisiert, damit Frontend-Bugs nicht durchschlagen.
+function normalizeProfile(p) {
+  if (!p) return null;
+  const grade = Number(p.grade) || null;
+  let schoolType = String(p.schoolType || '').trim() || null;
+  if (grade && grade >= 1 && grade <= 4) {
+    schoolType = 'Grundschule';
+  }
+  return {
+    grade,
+    schoolType,
+    state: String(p.state || '').trim() || null,        // Bundesland-Code (z.B. "BY", "NW")
+    language: String(p.language || '').trim() || DEFAULT_LANGUAGE,
+  };
+}
+
 /**
- * Übersetzt Klassenstufe/Schulform in eine Beschreibung für die KI.
+ * Übersetzt Profil in eine Beschreibung für die KI.
  * Wird in alle relevanten Prompts eingebaut.
  */
 function profileToPromptBlock(profile) {
@@ -126,6 +151,7 @@ function profileToPromptBlock(profile) {
   }
   const grade = profile.grade;
   const school = profile.schoolType || 'unbekannt';
+  const stateLabel = profile.state || 'unbekannt';
   let stage;
   if (grade <= 4) stage = 'Grundschule (Primärstufe)';
   else if (grade <= 10) stage = 'Sekundarstufe I';
@@ -135,12 +161,21 @@ function profileToPromptBlock(profile) {
     'SCHÜLER-PROFIL:\n' +
     `- Klassenstufe: ${grade}\n` +
     `- Schulform: ${school}\n` +
+    `- Bundesland: ${stateLabel}\n` +
     `- Bildungsstufe: ${stage}\n` +
     '- Passe Themen, Wortschatz, Satzkomplexität und Schwierigkeit der Übungen ' +
     'an dieses Niveau an. Keine kindlichen Themen für ältere Schüler (z.B. keine ' +
     '„Wenn ich Superkräfte hätte"-Aufgaben für eine 12. Klasse). Bei jüngeren Klassen ' +
     'einfache Sätze, geläufiger Wortschatz.\n'
   );
+}
+
+/**
+ * Baut den kompletten Kontext-Block für die KI: Profil + Curriculum + ggf. Sprach-Hinweise.
+ * Wird in allen Prompts genutzt – eine zentrale Stelle, sauber erweiterbar.
+ */
+function buildContextBlock(profile) {
+  return profileToPromptBlock(profile) + '\n' + curriculumPromptBlock(profile);
 }
 
 // Debug: Liste aller aktiven Sessions mit Kurz-Zusammenfassung
@@ -379,10 +414,7 @@ app.post('/api/analyze', async (req, res) => {
 
   const session = getSession(sessionId);
   if (profile && typeof profile === 'object') {
-    session.profile = {
-      grade: Number(profile.grade) || null,
-      schoolType: String(profile.schoolType || '').slice(0, 60),
-    };
+    session.profile = normalizeProfile(profile);
   }
   const sizesKb = images.map((d) => Math.round((d.length * 0.75) / 1024));
   console.log(`[analyze] Session: ${sessionId}`);
@@ -395,7 +427,7 @@ app.post('/api/analyze', async (req, res) => {
     {
       type: 'text',
       text:
-        profileToPromptBlock(session.profile) + '\n' +
+        buildContextBlock(session.profile) + '\n' +
         'Auf den Bildern siehst du drei handgeschriebene Texte einer Schülerin / eines Schülers.\n' +
         'Lies die Handschrift sorgfältig. Identifiziere ALLE Rechtschreib-/Grammatik-Fehler ' +
         'und ordne sie spezifischen, trainierbaren KATEGORIEN (Features) zu.\n\n' +
@@ -427,11 +459,12 @@ app.post('/api/analyze', async (req, res) => {
   ];
 
   try {
+    const lang = getLanguage(session.profile?.language);
     const { text } = await callClaude({
       label: 'analyze',
       systemPrompt:
-        'Du bist eine erfahrene Deutschlehrkraft für alle Klassenstufen (1-13). ' +
-        'Du analysierst Handschrift-Bilder und baust ein strukturiertes Fehlerprofil. ' +
+        lang.teacherRole +
+        ' Du analysierst Handschrift-Bilder und baust ein strukturiertes Fehlerprofil. ' +
         'Du passt deine Erwartungen an die angegebene Klassenstufe an. ' +
         'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent,
@@ -565,7 +598,7 @@ app.post('/api/next-exercise', async (req, res) => {
 
   const prompt =
     'Du erstellst EINE handschriftliche Rechtschreibübung für eine Schülerin / einen Schüler.\n\n' +
-    profileToPromptBlock(session.profile) + '\n' +
+    buildContextBlock(session.profile) + '\n' +
     'WICHTIG: Die App ist eine MOTORISCH FÖRDERNDE Lern-App. Die Aufgabe wird HANDSCHRIFTLICH ' +
     'auf einem digitalen Notizbuch abgeschrieben. Es gibt KEINE Multiple-Choice, KEINE Tastatur.\n\n' +
     'FEATURE-TABLE des Lerners (Memory):\n' +
@@ -613,11 +646,12 @@ app.post('/api/next-exercise', async (req, res) => {
   );
 
   try {
+    const lang = getLanguage(session.profile?.language);
     const { text } = await callClaude({
       label: 'next-exercise',
       systemPrompt:
-        'Du bist ein adaptiver Deutsch-Tutor für alle Klassenstufen (1-13). ' +
-        'Du erstellst gezielte Rechtschreibübungen mit altersgerechten Erklärungen. ' +
+        lang.teacherRole +
+        ' Du erstellst gezielte Rechtschreib-/Grammatik-Übungen mit altersgerechten Erklärungen. ' +
         'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent: prompt,
       maxTokens: 2500,
@@ -684,7 +718,7 @@ app.post('/api/submit-exercise', async (req, res) => {
 
   // Vision-Prompt: KI liest die Schrift, vergleicht, bewertet, erkennt neue Features
   const gradeText =
-    profileToPromptBlock(session.profile) + '\n' +
+    buildContextBlock(session.profile) + '\n' +
     'Auf dem Bild siehst du den handgeschriebenen Text einer Schülerin / eines Schülers.\n\n' +
     'KONTEXT DER ÜBUNG:\n' +
     `- Übungstyp: ${last.type}\n` +
@@ -733,12 +767,12 @@ app.post('/api/submit-exercise', async (req, res) => {
 
   let aiGrading = null;
   try {
+    const lang = getLanguage(session.profile?.language);
     const { text } = await callClaude({
       label: 'submit',
       systemPrompt:
-        'Du bist ein strenger, aber kindgerechter deutscher Rechtschreiblehrer. ' +
-        'Du liest Kinderhandschrift, bewertest präzise nach Feature und erkennst neue Fehlermuster. ' +
-        'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
+        lang.graderRole +
+        ' Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
       userContent,
       maxTokens: 3000,
     });

@@ -223,13 +223,13 @@ const state = {
   currentTopicIndex: 0,
   capturedImages: [],
   selectedTopics: pickRandomTopics(3),
-  profile: { grade: null, schoolType: null }, // wird im Profile-Screen gesetzt
+  profile: { grade: null, schoolType: null, state: null }, // state = Bundesland
   currentExercise: null,
   retryAction: null,
 };
 
 // ─────────────────────────────────────────────────────────
-// Profile-Screen: Klassenstufe + Schulform abfragen
+// Profile-Screen: Klassenstufe + Schulform + Bundesland
 // ─────────────────────────────────────────────────────────
 const SCHOOL_TYPES = [
   { value: 'Grundschule', label: 'Grundschule' },
@@ -240,9 +240,38 @@ const SCHOOL_TYPES = [
   { value: 'Berufsschule', label: 'Berufsschule / BBS' },
 ];
 
+// Die 16 Bundesländer. Werte werden zusätzlich an die KI mitgeschickt,
+// damit später (mit Verlags-Daten) das passende Curriculum gezogen werden kann.
+const GERMAN_STATES = [
+  { value: 'BW', label: 'Baden-Württemberg' },
+  { value: 'BY', label: 'Bayern' },
+  { value: 'BE', label: 'Berlin' },
+  { value: 'BB', label: 'Brandenburg' },
+  { value: 'HB', label: 'Bremen' },
+  { value: 'HH', label: 'Hamburg' },
+  { value: 'HE', label: 'Hessen' },
+  { value: 'MV', label: 'Mecklenburg-Vorpommern' },
+  { value: 'NI', label: 'Niedersachsen' },
+  { value: 'NW', label: 'Nordrhein-Westfalen' },
+  { value: 'RP', label: 'Rheinland-Pfalz' },
+  { value: 'SL', label: 'Saarland' },
+  { value: 'SN', label: 'Sachsen' },
+  { value: 'ST', label: 'Sachsen-Anhalt' },
+  { value: 'SH', label: 'Schleswig-Holstein' },
+  { value: 'TH', label: 'Thüringen' },
+];
+
+// Klasse 1-4 → automatisch Grundschule (kein extra Klick nötig)
+function isElementary(grade) {
+  return grade && grade >= 1 && grade <= 4;
+}
+
 function renderProfileScreen() {
-  // Klassenstufen-Buttons (1-13)
   const gradeWrap = document.getElementById('grade-buttons');
+  const schoolWrap = document.getElementById('school-buttons');
+  const stateWrap = document.getElementById('state-buttons');
+
+  // Klassenstufen-Buttons (1-13)
   gradeWrap.innerHTML = '';
   for (let i = 1; i <= 13; i++) {
     const b = document.createElement('button');
@@ -253,12 +282,20 @@ function renderProfileScreen() {
       gradeWrap.querySelectorAll('.choice-btn').forEach((x) => x.classList.remove('selected'));
       b.classList.add('selected');
       state.profile.grade = i;
+      // Auto-Grundschule für Klasse 1-4
+      if (isElementary(i)) {
+        state.profile.schoolType = 'Grundschule';
+      } else if (state.profile.schoolType === 'Grundschule') {
+        // Bei Wechsel von <=4 auf >=5: Schulform zurücksetzen
+        state.profile.schoolType = null;
+      }
+      refreshSchoolTypeField();
       updateProfileContinue();
     });
     gradeWrap.appendChild(b);
   }
+
   // Schulform-Buttons
-  const schoolWrap = document.getElementById('school-buttons');
   schoolWrap.innerHTML = '';
   SCHOOL_TYPES.forEach((s) => {
     const b = document.createElement('button');
@@ -273,25 +310,60 @@ function renderProfileScreen() {
     });
     schoolWrap.appendChild(b);
   });
-  // Falls schon was gewählt war (z.B. nach Zurück-Navigation), Auswahl wiederherstellen
-  if (state.profile.grade) {
-    const sel = gradeWrap.querySelector(`[data-grade="${state.profile.grade}"]`);
-    if (sel) sel.classList.add('selected');
-  }
-  if (state.profile.schoolType) {
-    const sel = schoolWrap.querySelector(`[data-value="${state.profile.schoolType}"]`);
-    if (sel) sel.classList.add('selected');
-  }
+
+  // Bundesland-Buttons
+  stateWrap.innerHTML = '';
+  GERMAN_STATES.forEach((s) => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = s.label;
+    b.dataset.value = s.value;
+    b.addEventListener('click', () => {
+      stateWrap.querySelectorAll('.choice-btn').forEach((x) => x.classList.remove('selected'));
+      b.classList.add('selected');
+      state.profile.state = s.value;
+      updateProfileContinue();
+    });
+    stateWrap.appendChild(b);
+  });
+
+  // Auswahl wiederherstellen
+  restoreSelection(gradeWrap, 'grade', state.profile.grade);
+  restoreSelection(schoolWrap, 'value', state.profile.schoolType);
+  restoreSelection(stateWrap, 'value', state.profile.state);
+
+  refreshSchoolTypeField();
   updateProfileContinue();
 }
 
+function restoreSelection(wrap, attr, value) {
+  if (!value) return;
+  const sel = wrap.querySelector(`[data-${attr}="${value}"]`);
+  if (sel) sel.classList.add('selected');
+}
+
+// Bei Klasse 1-4 wird das Schulform-Feld ausgeblendet (auto = Grundschule)
+function refreshSchoolTypeField() {
+  const field = document.getElementById('schoolType-field');
+  const hint = document.getElementById('schoolType-hint');
+  const schoolWrap = document.getElementById('school-buttons');
+  if (!field) return;
+  const auto = isElementary(state.profile.grade);
+  schoolWrap.hidden = auto;
+  hint.hidden = !auto;
+  // Bei Auto-Grundschule: visuell markieren falls Feld später wieder sichtbar wird
+  if (!auto) {
+    restoreSelection(schoolWrap, 'value', state.profile.schoolType);
+  }
+}
+
 function updateProfileContinue() {
-  document.getElementById('btn-profile-continue').disabled =
-    !state.profile.grade || !state.profile.schoolType;
+  const profileComplete =
+    !!state.profile.grade && !!state.profile.schoolType && !!state.profile.state;
+  document.getElementById('btn-profile-continue').disabled = !profileComplete;
 }
 
 document.getElementById('btn-profile-continue').addEventListener('click', () => {
-  // Themen jetzt anhand der Klassenstufe ziehen
   state.selectedTopics = pickRandomTopics(3, state.profile.grade);
   state.currentTopicIndex = 0;
   state.capturedImages = [];
