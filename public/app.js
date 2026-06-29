@@ -229,49 +229,97 @@ const state = {
 };
 
 // ─────────────────────────────────────────────────────────
-// Profile-Screen: Klassenstufe + Schulform + Bundesland
+// Profile-Screen: Bundesland → Klassenstufe → Schulform
+//   Bundesländer + Schulformen werden vom Server geladen
+//   (single source of truth: lib/curriculum-data/_states-meta.js)
 // ─────────────────────────────────────────────────────────
-const SCHOOL_TYPES = [
-  { value: 'Grundschule', label: 'Grundschule' },
-  { value: 'Hauptschule', label: 'Hauptschule' },
-  { value: 'Realschule', label: 'Realschule' },
-  { value: 'Gymnasium', label: 'Gymnasium' },
-  { value: 'Gesamtschule', label: 'Gesamtschule' },
-  { value: 'Berufsschule', label: 'Berufsschule / BBS' },
-];
 
-// Die 16 Bundesländer. Werte werden zusätzlich an die KI mitgeschickt,
-// damit später (mit Verlags-Daten) das passende Curriculum gezogen werden kann.
-const GERMAN_STATES = [
-  { value: 'BW', label: 'Baden-Württemberg' },
-  { value: 'BY', label: 'Bayern' },
-  { value: 'BE', label: 'Berlin' },
-  { value: 'BB', label: 'Brandenburg' },
-  { value: 'HB', label: 'Bremen' },
-  { value: 'HH', label: 'Hamburg' },
-  { value: 'HE', label: 'Hessen' },
-  { value: 'MV', label: 'Mecklenburg-Vorpommern' },
-  { value: 'NI', label: 'Niedersachsen' },
-  { value: 'NW', label: 'Nordrhein-Westfalen' },
-  { value: 'RP', label: 'Rheinland-Pfalz' },
-  { value: 'SL', label: 'Saarland' },
-  { value: 'SN', label: 'Sachsen' },
-  { value: 'ST', label: 'Sachsen-Anhalt' },
-  { value: 'SH', label: 'Schleswig-Holstein' },
-  { value: 'TH', label: 'Thüringen' },
-];
+// Cache, damit wir bei jedem Re-Open nicht neu laden müssen
+const profileOptionsCache = {
+  states: null,                      // [{ value, label }]
+  schoolFormsByState: {},             // { state: { schoolForms, primaryUpTo } }
+};
 
-// Klasse 1-4 → automatisch Grundschule (kein extra Klick nötig)
-function isElementary(grade) {
-  return grade && grade >= 1 && grade <= 4;
+async function loadStates() {
+  if (profileOptionsCache.states) return profileOptionsCache.states;
+  try {
+    const res = await fetch('/api/profile/states');
+    const data = await res.json();
+    profileOptionsCache.states = data.states || [];
+  } catch (e) {
+    console.error('[profile] States laden fehlgeschlagen, Fallback minimal.', e);
+    // Notfall-Fallback (sollte nicht passieren wenn Server läuft)
+    profileOptionsCache.states = [
+      { value: 'BW', label: 'Baden-Württemberg' },
+      { value: 'BY', label: 'Bayern' },
+      { value: 'BE', label: 'Berlin' },
+      { value: 'BB', label: 'Brandenburg' },
+      { value: 'HB', label: 'Bremen' },
+      { value: 'HH', label: 'Hamburg' },
+      { value: 'HE', label: 'Hessen' },
+      { value: 'MV', label: 'Mecklenburg-Vorpommern' },
+      { value: 'NI', label: 'Niedersachsen' },
+      { value: 'NW', label: 'Nordrhein-Westfalen' },
+      { value: 'RP', label: 'Rheinland-Pfalz' },
+      { value: 'SL', label: 'Saarland' },
+      { value: 'SN', label: 'Sachsen' },
+      { value: 'ST', label: 'Sachsen-Anhalt' },
+      { value: 'SH', label: 'Schleswig-Holstein' },
+      { value: 'TH', label: 'Thüringen' },
+    ];
+  }
+  return profileOptionsCache.states;
 }
 
-function renderProfileScreen() {
-  const gradeWrap = document.getElementById('grade-buttons');
-  const schoolWrap = document.getElementById('school-buttons');
-  const stateWrap = document.getElementById('state-buttons');
+async function loadSchoolForms(stateCode) {
+  if (profileOptionsCache.schoolFormsByState[stateCode]) {
+    return profileOptionsCache.schoolFormsByState[stateCode];
+  }
+  try {
+    const res = await fetch('/api/profile/school-forms?state=' + encodeURIComponent(stateCode));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    profileOptionsCache.schoolFormsByState[stateCode] = data;
+    return data;
+  } catch (e) {
+    console.error('[profile] Schulformen für', stateCode, 'fehlgeschlagen.', e);
+    return { schoolForms: [], primaryUpTo: 4 };
+  }
+}
 
-  // Klassenstufen-Buttons (1-13)
+function isElementary(grade) {
+  const primary = profileOptionsCache.schoolFormsByState[state.profile.state]?.primaryUpTo || 4;
+  return grade && grade >= 1 && grade <= primary;
+}
+
+async function renderProfileScreen() {
+  const stateWrap = document.getElementById('state-buttons');
+  const gradeWrap = document.getElementById('grade-buttons');
+
+  // 1) Bundesland zuerst
+  const states = await loadStates();
+  stateWrap.innerHTML = '';
+  states.forEach((s) => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.textContent = s.label;
+    b.dataset.value = s.value;
+    b.addEventListener('click', async () => {
+      stateWrap.querySelectorAll('.choice-btn').forEach((x) => x.classList.remove('selected'));
+      b.classList.add('selected');
+      state.profile.state = s.value;
+      // Bei Bundesland-Wechsel: Schulform-Auswahl ggf. invalidieren
+      const opts = await loadSchoolForms(s.value);
+      const stillValid = opts.schoolForms.some((sf) => sf.value === state.profile.schoolType);
+      if (!stillValid) state.profile.schoolType = null;
+      renderSchoolForms();
+      refreshSchoolTypeField();
+      updateProfileContinue();
+    });
+    stateWrap.appendChild(b);
+  });
+
+  // 2) Klassenstufen-Buttons (1-13)
   gradeWrap.innerHTML = '';
   for (let i = 1; i <= 13; i++) {
     const b = document.createElement('button');
@@ -282,11 +330,9 @@ function renderProfileScreen() {
       gradeWrap.querySelectorAll('.choice-btn').forEach((x) => x.classList.remove('selected'));
       b.classList.add('selected');
       state.profile.grade = i;
-      // Auto-Grundschule für Klasse 1-4
       if (isElementary(i)) {
         state.profile.schoolType = 'Grundschule';
       } else if (state.profile.schoolType === 'Grundschule') {
-        // Bei Wechsel von <=4 auf >=5: Schulform zurücksetzen
         state.profile.schoolType = null;
       }
       refreshSchoolTypeField();
@@ -295,9 +341,38 @@ function renderProfileScreen() {
     gradeWrap.appendChild(b);
   }
 
-  // Schulform-Buttons
+  // 3) Schulformen werden dynamisch nach Bundesland-Auswahl gefüllt
+  renderSchoolForms();
+
+  // Auswahl wiederherstellen
+  restoreSelection(stateWrap, 'value', state.profile.state);
+  restoreSelection(gradeWrap, 'grade', state.profile.grade);
+
+  // Wenn Bundesland schon gewählt war: Schulformen laden + auswählen
+  if (state.profile.state) {
+    await loadSchoolForms(state.profile.state);
+    renderSchoolForms();
+    restoreSelection(document.getElementById('school-buttons'), 'value', state.profile.schoolType);
+  }
+
+  refreshSchoolTypeField();
+  updateProfileContinue();
+}
+
+function renderSchoolForms() {
+  const schoolWrap = document.getElementById('school-buttons');
   schoolWrap.innerHTML = '';
-  SCHOOL_TYPES.forEach((s) => {
+  if (!state.profile.state) {
+    schoolWrap.innerHTML =
+      '<div class="profile-hint-soft">Wähle erst dein Bundesland aus.</div>';
+    return;
+  }
+  const opts = profileOptionsCache.schoolFormsByState[state.profile.state];
+  if (!opts) {
+    schoolWrap.innerHTML = '<div class="profile-hint-soft">Lade Schulformen…</div>';
+    return;
+  }
+  opts.schoolForms.forEach((s) => {
     const b = document.createElement('button');
     b.className = 'choice-btn';
     b.textContent = s.label;
@@ -310,30 +385,10 @@ function renderProfileScreen() {
     });
     schoolWrap.appendChild(b);
   });
-
-  // Bundesland-Buttons
-  stateWrap.innerHTML = '';
-  GERMAN_STATES.forEach((s) => {
-    const b = document.createElement('button');
-    b.className = 'choice-btn';
-    b.textContent = s.label;
-    b.dataset.value = s.value;
-    b.addEventListener('click', () => {
-      stateWrap.querySelectorAll('.choice-btn').forEach((x) => x.classList.remove('selected'));
-      b.classList.add('selected');
-      state.profile.state = s.value;
-      updateProfileContinue();
-    });
-    stateWrap.appendChild(b);
-  });
-
-  // Auswahl wiederherstellen
-  restoreSelection(gradeWrap, 'grade', state.profile.grade);
-  restoreSelection(schoolWrap, 'value', state.profile.schoolType);
-  restoreSelection(stateWrap, 'value', state.profile.state);
-
-  refreshSchoolTypeField();
-  updateProfileContinue();
+  // Vorherige Auswahl wiederherstellen (falls noch gültig)
+  if (state.profile.schoolType) {
+    restoreSelection(schoolWrap, 'value', state.profile.schoolType);
+  }
 }
 
 function restoreSelection(wrap, attr, value) {
@@ -342,7 +397,7 @@ function restoreSelection(wrap, attr, value) {
   if (sel) sel.classList.add('selected');
 }
 
-// Bei Klasse 1-4 wird das Schulform-Feld ausgeblendet (auto = Grundschule)
+// Bei Klasse 1-4 (oder 1-6 in BE/BB) wird das Schulform-Feld ausgeblendet (auto = Grundschule)
 function refreshSchoolTypeField() {
   const field = document.getElementById('schoolType-field');
   const hint = document.getElementById('schoolType-hint');
@@ -351,15 +406,17 @@ function refreshSchoolTypeField() {
   const auto = isElementary(state.profile.grade);
   schoolWrap.hidden = auto;
   hint.hidden = !auto;
-  // Bei Auto-Grundschule: visuell markieren falls Feld später wieder sichtbar wird
-  if (!auto) {
+  if (auto) {
+    const primary = profileOptionsCache.schoolFormsByState[state.profile.state]?.primaryUpTo || 4;
+    hint.textContent = `Klasse 1–${primary} ist automatisch Grundschule.`;
+  } else if (!schoolWrap.hidden) {
     restoreSelection(schoolWrap, 'value', state.profile.schoolType);
   }
 }
 
 function updateProfileContinue() {
   const profileComplete =
-    !!state.profile.grade && !!state.profile.schoolType && !!state.profile.state;
+    !!state.profile.state && !!state.profile.grade && !!state.profile.schoolType;
   document.getElementById('btn-profile-continue').disabled = !profileComplete;
 }
 

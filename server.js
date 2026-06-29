@@ -34,7 +34,13 @@ const Anthropic = require('@anthropic-ai/sdk').default || require('@anthropic-ai
 //   - Curriculum-Slot (echte Daten: Hessen; weitere Bundesländer kommen via Partner)
 //   - Lernmethoden (aktuell: FRESCH für Deutsch)
 const { getLanguage, DEFAULT_LANGUAGE } = require('./lib/languages');
-const { curriculumPromptBlock } = require('./lib/curriculum');
+const {
+  curriculumPromptBlock,
+  listStatesForFrontend,
+  listSchoolFormsForState,
+  primaryUpTo,
+  isValidProfile,
+} = require('./lib/curriculum');
 const { freschMethodPromptBlock } = require('./lib/methods/fresch');
 
 const app = express();
@@ -85,15 +91,40 @@ app.use((req, res, next) => {
 // Health-Endpoint
 app.get('/api/health', (req, res) => {
   const { listLanguages } = require('./lib/languages');
+  const { listStateCodes } = require('./lib/curriculum');
   res.json({
     ok: true,
     apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     provider: 'anthropic',
     model: MODEL,
     languages: listLanguages(),
-    curriculumStates: ['HE'],
+    supportedStates: listStateCodes(),
+    statesWithDetailedCurriculum: ['HE'],
     methods: ['FRESCH'],
     time: new Date().toISOString(),
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// Profile-Optionen: Bundesländer und Schulformen für das Frontend
+// ─────────────────────────────────────────────────────────────
+
+// Liste aller Bundesländer (für den Profile-Screen)
+app.get('/api/profile/states', (req, res) => {
+  res.json({ states: listStatesForFrontend() });
+});
+
+// Schulformen + Primarstufen-Grenze für ein bestimmtes Bundesland
+app.get('/api/profile/school-forms', (req, res) => {
+  const state = String(req.query.state || '').trim();
+  const forms = listSchoolFormsForState(state);
+  if (!forms.length) {
+    return res.status(404).json({ error: 'Bundesland unbekannt oder ohne hinterlegte Schulformen.' });
+  }
+  res.json({
+    state,
+    schoolForms: forms,
+    primaryUpTo: primaryUpTo(state),
   });
 });
 
@@ -128,19 +159,23 @@ function getSession(sessionId) {
   return sessions[sessionId];
 }
 
-// Normalisiert das Profil: Klasse 1-4 wird immer als Grundschule behandelt,
-// fehlende Sprache → Default. Hier zentralisiert, damit Frontend-Bugs nicht durchschlagen.
+// Normalisiert das Profil. Auto-Grundschule berücksichtigt bundesland-spezifische
+// Primarstufen-Grenzen: BE/BB haben Grundschule bis Klasse 6, alle anderen bis Klasse 4.
 function normalizeProfile(p) {
   if (!p) return null;
   const grade = Number(p.grade) || null;
+  const state = String(p.state || '').trim() || null;
   let schoolType = String(p.schoolType || '').trim() || null;
-  if (grade && grade >= 1 && grade <= 4) {
+
+  const primary = primaryUpTo(state);
+  if (grade && grade >= 1 && grade <= primary) {
     schoolType = 'Grundschule';
   }
+
   return {
     grade,
     schoolType,
-    state: String(p.state || '').trim() || null,        // Bundesland-Code (z.B. "BY", "NW")
+    state,
     language: String(p.language || '').trim() || DEFAULT_LANGUAGE,
   };
 }
