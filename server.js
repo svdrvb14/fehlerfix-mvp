@@ -635,18 +635,29 @@ app.post('/api/next-exercise', async (req, res) => {
 
   const typeDescriptions = {
     cloze_text:
-      'LÜCKENTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (3-5 Sätze, eine kleine ' +
-      'Geschichte / Beobachtung mit rotem Faden) mit 2-4 Lücken "___".\n' +
-      'STRENGE LÜCKEN-REGELN:\n' +
-      '- Lücken dürfen NUR Buchstabengruppen ersetzen, wo das Fokus-Feature die Schreibung ' +
-      'verwirrend macht (z.B. "ie" in "T___ger" → "Tier", oder "ss" in "Stra___e" → "Straße").\n' +
-      '- VERBOTEN: Lücken auf Satzzeichen, Bindestrichen, Apostrophen, Anführungszeichen, ' +
-      'Leerzeichen, Zahlen oder ganzen Wörtern. NIEMALS so etwas wie "Start___Ups" wo die ' +
-      'Lücke der Bindestrich wäre – das ist kein Rechtschreibproblem.\n' +
-      '- Lücken müssen ECHTE Verwechslungsstellen sein, die die Klassenstufe wirklich falsch ' +
-      'machen würde.\n' +
-      '- Reihenfolge der ___ = Reihenfolge der Feature-Vorkommen.\n' +
-      'instruction-Beispiel: "Schreibe den Text ab und fülle die Lücken."',
+      'LÜCKENTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (4-5 Sätze, eine kleine ' +
+      'Geschichte / Beobachtung mit rotem Faden). Die Übung muss DICHT sein – viele ' +
+      'Entscheidungsstellen, nicht nur ein, zwei.\n' +
+      'ANZAHL: Erzeuge MINDESTENS 6, besser 7-10 Lücken/Entscheidungsstellen über den Text. ' +
+      'Lieber mehr Stellen als längerer Text – der Text bleibt etwa gleich lang, aber prall gefüllt ' +
+      'mit Übungsmöglichkeiten zum Fokus-Feature.\n\n' +
+      'ES GIBT ZWEI ARTEN von Lückentext, je nach Fokus-Feature:\n\n' +
+      'A) RECHTSCHREIB-FEATURES (ie/i, ss/ß, Doppelkonsonanten, Dehnung, das/dass usw.):\n' +
+      '   - Setze "___" für die Buchstabengruppe, wo das Feature greift ' +
+      '(z.B. "T___ger"→"ie", "Stra___e"→"ß", "da___ Haus"→"s").\n' +
+      '   - VERBOTEN: Lücken auf Satzzeichen, Bindestrichen, Leerzeichen, Zahlen oder ganzen Wörtern.\n' +
+      '   - Baue möglichst viele echte Vorkommen des Features ein (Ziel 6-10).\n\n' +
+      'B) ZEICHENSETZUNGS-FEATURES (Kommasetzung, Satzzeichen):\n' +
+      '   - Hier wird NICHT mit "___" gearbeitet. Stattdessen: Schreibe den Text und markiere ' +
+      'JEDE Stelle, an der MÖGLICHERWEISE ein Komma stehen könnte, mit dem Platzhalter " [ ] " ' +
+      '(Leerzeichen, eckige Klammer auf, Leerzeichen, eckige Klammer zu, Leerzeichen).\n' +
+      '   - WICHTIG: Markiere SOWOHL Stellen, an denen ein Komma hingehört, ALS AUCH Stellen, an ' +
+      'denen KEINS hingehört (Fallen). So entscheidet der Nutzer pro Stelle „Komma oder nicht".\n' +
+      '   - Ziel: 6-10 solcher Entscheidungsstellen über den Text verteilt.\n' +
+      '   - Im correctText steht der Text mit den KORREKT gesetzten Kommas (und ohne Klammern).\n' +
+      '   - instruction-Beispiel: "Schreibe den Text ab. Setze an den markierten Stellen ein Komma – ' +
+      'aber nur dort, wo eins hingehört!"\n\n' +
+      'instruction-Beispiel (Rechtschreibung): "Schreibe den Text ab und fülle die Lücken."',
 
     error_text:
       'FEHLERTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (3-5 Sätze, kleine ' +
@@ -712,11 +723,18 @@ app.post('/api/next-exercise', async (req, res) => {
     '{\n' +
     `  "type": "${exType}",\n` +
     '  "focusFeature": "<exakter Name aus Feature-Table>",\n' +
+    '  "topic": "<kurzes, klares Thema dieser Übung für die Überschrift, z.B. \\"Kommasetzung\\", ' +
+    '\\"ie/i-Schreibung\\", \\"das/dass\\", \\"Doppelkonsonanten\\">",\n' +
     '  "instruction": "<altersgerechte Aufgabenstellung OHNE Antworten zu verraten>",\n' +
-    '  "displayText": "<der Text, der angezeigt wird – Lücken bei cloze_text, Fehler bei error_text, LEER bei audio_dictation>",\n' +
+    '  "tips": ["<Achtsamkeit 1: worauf das Kind achten soll>", "<Achtsamkeit 2>", "<Achtsamkeit 3>"],\n' +
+    '  "displayText": "<der Text, der angezeigt wird – Lücken/Markierungen bei cloze_text, Fehler bei error_text, LEER bei audio_dictation>",\n' +
     '  "correctText": "<die vollständig korrekte Lösung, die geschrieben werden sollte – bei audio_dictation: der vorzulesende Text>",\n' +
     '  "explanation": "<1-2 Sätze, erklärt die Regel/das WARUM des Features – wird NACH der Bewertung gezeigt>"\n' +
-    '}';
+    '}\n\n' +
+    'ZU "topic": kurzes Schlagwort, das oben über der Aufgabe als Überschrift steht. Macht sofort klar, ' +
+    'worum es geht (das Thema darf genannt werden – nur die konkreten Lösungswörter nicht).\n' +
+    'ZU "tips": geben 2-3 konkrete Achtsamkeiten, worauf das Kind bei DIESEM Thema achten soll ' +
+    '(kindgerecht, kurz, ohne die Lösung zu verraten). Beziehe wenn passend die FRESCH-Strategie ein.';
 
   console.log(
     `[next-exercise] Typ: ${exType}, Fokus: "${focusFeature}" (Gewicht ${focusEntry?.practice_weight}), ` +

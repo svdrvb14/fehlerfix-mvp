@@ -180,10 +180,14 @@
             <span class="level-badge" id="ex-level-badge">Level 1</span>
           </div>
 
-          <!-- Aufgaben-Karte: Anweisung + anzuzeigender Text ODER Audio-Player -->
+          <!-- Aufgaben-Karte: Thema + Anweisung + Achtsamkeiten + Text/Player -->
           <div class="card instruction-card">
-            <div class="card-kicker">Aufgabe</div>
+            <div class="card-kicker">
+              <span>Aufgabe</span>
+              <span class="topic-badge" id="ex-topic" hidden></span>
+            </div>
             <h2 class="task-title" id="ex-instruction">...</h2>
+            <ul class="ex-tips" id="ex-tips" hidden></ul>
             <div class="display-text" id="ex-display-text"></div>
 
             <!-- Audio-Diktat-Player: nur sichtbar bei type="audio_dictation".

@@ -1041,6 +1041,26 @@ function renderExercise(exercise) {
   document.getElementById('ex-instruction').textContent =
     exercise.instruction || 'Schreibe den Text ab.';
 
+  // Thema-Badge oben (z.B. "Kommasetzung") – macht das adressierte Thema klar
+  const topicEl = document.getElementById('ex-topic');
+  if (exercise.topic) {
+    topicEl.textContent = exercise.topic;
+    topicEl.hidden = false;
+  } else {
+    topicEl.hidden = true;
+  }
+
+  // Achtsamkeiten: 2-3 Dinge, worauf das Kind achten soll
+  const tipsEl = document.getElementById('ex-tips');
+  const tips = Array.isArray(exercise.tips) ? exercise.tips.filter(Boolean) : [];
+  if (tips.length) {
+    tipsEl.innerHTML = tips.map((t) => `<li>${escapeHtml(t)}</li>`).join('');
+    tipsEl.hidden = false;
+  } else {
+    tipsEl.innerHTML = '';
+    tipsEl.hidden = true;
+  }
+
   const displayEl = document.getElementById('ex-display-text');
   const dictationPlayerEl = document.getElementById('dictation-player');
 
@@ -1060,18 +1080,7 @@ function renderExercise(exercise) {
     displayEl.innerHTML = '';
     const text = exercise.displayText || '';
     if (exercise.type === 'cloze_text') {
-      const parts = text.split('___');
-      parts.forEach((part, i) => {
-        const span = document.createElement('span');
-        span.textContent = part;
-        displayEl.appendChild(span);
-        if (i < parts.length - 1) {
-          const blank = document.createElement('span');
-          blank.className = 'blank';
-          blank.textContent = '____';
-          displayEl.appendChild(blank);
-        }
-      });
+      renderClozeText(displayEl, text);
     } else {
       displayEl.textContent = text;
     }
@@ -1085,6 +1094,41 @@ function renderExercise(exercise) {
   }, 30);
 
   document.getElementById('btn-check').disabled = true;
+}
+
+/**
+ * Rendert einen Lückentext. Unterstützt zwei Marker-Typen:
+ *   "___"  → Buchstaben-Lücke (Rechtschreib-Features)
+ *   "[ ]"  → Komma-Entscheidungsstelle (Zeichensetzungs-Features):
+ *            hier entscheidet das Kind beim Abschreiben, ob ein Komma hingehört.
+ */
+function renderClozeText(displayEl, text) {
+  // Zuerst nach den Komma-Markern [ ] tokenisieren, dann jeden Teil nach ___ .
+  const commaToken = /\[\s*\]/g;
+  const segments = String(text).split(commaToken);
+  segments.forEach((segment, sIdx) => {
+    // Buchstaben-Lücken innerhalb des Segments
+    const parts = segment.split('___');
+    parts.forEach((part, i) => {
+      const span = document.createElement('span');
+      span.textContent = part;
+      displayEl.appendChild(span);
+      if (i < parts.length - 1) {
+        const blank = document.createElement('span');
+        blank.className = 'blank';
+        blank.textContent = '____';
+        displayEl.appendChild(blank);
+      }
+    });
+    // Komma-Entscheidungsmarker zwischen den Segmenten
+    if (sIdx < segments.length - 1) {
+      const slot = document.createElement('span');
+      slot.className = 'comma-slot';
+      slot.textContent = '◦';
+      slot.title = 'Komma hier? Du entscheidest beim Abschreiben.';
+      displayEl.appendChild(slot);
+    }
+  });
 }
 
 // ─── Audio-Diktat-Player mit Satz-Navigation ────────
