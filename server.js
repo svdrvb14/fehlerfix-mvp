@@ -135,11 +135,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ─────────────────────────────────────────────────────────────
 const sessions = {};
 
+// Sessions liegen im RAM. Damit der Speicher nicht unbegrenzt wächst (viele
+// Schüler über die Zeit), werden inaktive Sessions nach SESSION_TTL_MS entfernt.
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 Stunden
+const SESSION_SWEEP_MS = 60 * 60 * 1000; // stündlich aufräumen
+
 function getSession(sessionId) {
   if (!sessions[sessionId]) {
     sessions[sessionId] = {
       // Schüler-Profil (für altersgerechte Themen, Komplexität, Bewertung)
-      profile: null, // { grade, schoolType }
+      profile: null, // { grade, schoolType, state, language }
 
       // Custom Memory – wächst über die Zeit
       featureTable: [],
@@ -154,10 +159,29 @@ function getSession(sessionId) {
       level: 1,
       points: 0,
       exercisesCompleted: 0,
+
+      // Lifecycle
+      createdAt: Date.now(),
     };
   }
+  sessions[sessionId].lastAccess = Date.now();
   return sessions[sessionId];
 }
+
+// Periodisches Aufräumen alter Sessions (verhindert Memory-Leak im Dauerbetrieb)
+setInterval(() => {
+  const now = Date.now();
+  let removed = 0;
+  for (const [id, s] of Object.entries(sessions)) {
+    if (now - (s.lastAccess || s.createdAt || 0) > SESSION_TTL_MS) {
+      delete sessions[id];
+      removed++;
+    }
+  }
+  if (removed > 0) {
+    console.log(`[sessions] ${removed} inaktive Sessions aufgeräumt, ${Object.keys(sessions).length} aktiv.`);
+  }
+}, SESSION_SWEEP_MS).unref(); // unref: blockiert den Prozess-Exit nicht
 
 // Normalisiert das Profil. Auto-Grundschule berücksichtigt bundesland-spezifische
 // Primarstufen-Grenzen: BE/BB haben Grundschule bis Klasse 6, alle anderen bis Klasse 4.
@@ -579,7 +603,12 @@ app.post('/api/next-exercise', async (req, res) => {
 
   const session = getSession(sessionId);
   if (!session.featureTable || session.featureTable.length === 0) {
-    return res.status(400).json({ error: 'Noch keine Analyse vorhanden.' });
+    // Tritt z.B. nach Server-Neustart auf (In-Memory-State verloren).
+    // code: Frontend leitet damit sauber zum Neustart statt in eine Retry-Sackgasse.
+    return res.status(409).json({
+      error: 'Noch keine Analyse vorhanden.',
+      code: 'NO_ANALYSIS',
+    });
   }
 
   const weighted = weightedFeatures(session.featureTable);
@@ -759,7 +788,10 @@ app.post('/api/submit-exercise', async (req, res) => {
   const session = getSession(sessionId);
   const last = session.lastExercise;
   if (!last || !last.correctText) {
-    return res.status(400).json({ error: 'Keine aktive Übung gefunden.' });
+    return res.status(409).json({
+      error: 'Keine aktive Übung gefunden.',
+      code: 'NO_ACTIVE_EXERCISE',
+    });
   }
 
   const sizeKb = Math.round((image.length * 0.75) / 1024);

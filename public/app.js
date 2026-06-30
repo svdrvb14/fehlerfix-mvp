@@ -856,6 +856,13 @@ new MutationObserver(() => {
 // Screen 2: Loading & Analyse
 // ─────────────────────────────────────────────────────────
 let loadingInterval = null;
+// Setzt Titel + Untertext des Loading-Screens je nach Phase
+function setLoadingText(title, sub) {
+  const titleEl = document.getElementById('loading-title');
+  const subEl = document.getElementById('loading-status');
+  if (titleEl) titleEl.textContent = title;
+  if (subEl && sub != null) subEl.textContent = sub;
+}
 function startLoadingRotation() {
   let i = 0;
   document.getElementById('loading-status').textContent = LOADING_MESSAGES[0];
@@ -871,7 +878,7 @@ function stopLoadingRotation() {
 
 async function runAnalysis() {
   showScreen('loading');
-  document.getElementById('loading-status').textContent = 'Bereite deine Texte vor...';
+  setLoadingText('FehlerFix analysiert deine Texte...', 'Bereite deine Texte vor...');
   try {
     // Kleinere Bilder = kleinerer Body = robuster über WLAN/iPad-Hotspots
     const small = [];
@@ -934,6 +941,27 @@ function friendlyFetchError(err, phase = 'der Anfrage') {
   return err.message || 'Unbekannter Fehler. Versuch es nochmal.';
 }
 
+/**
+ * Prüft eine Server-Antwort auf "Session verloren"-Codes (z.B. nach Server-Neustart).
+ * Wenn ja: führt das Kind freundlich zurück zum Start statt in eine Retry-Sackgasse.
+ * Gibt true zurück, wenn der Fall behandelt wurde.
+ */
+function handleSessionLost(body) {
+  if (!body || (body.code !== 'NO_ANALYSIS' && body.code !== 'NO_ACTIVE_EXERCISE')) {
+    return false;
+  }
+  // Zähler zurücksetzen, damit der nächste Durchlauf sauber bei 1 startet
+  localStorage.removeItem('ff-ex-num');
+  localStorage.removeItem('ff-level');
+  state.currentExercise = null;
+  showError(
+    'Deine Sitzung ist abgelaufen (der Server wurde zwischendurch neu gestartet). ' +
+      'Kein Problem – schreib einfach deine drei Texte neu, dann geht es weiter.',
+    () => showScreen('welcome')
+  );
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────
 // Screen 3: Ready → Erste Übung
 // ─────────────────────────────────────────────────────────
@@ -971,7 +999,7 @@ function ensureExerciseEngine() {
 
 async function loadNextExercise() {
   showScreen('loading');
-  document.getElementById('loading-status').textContent = 'Bereite deine nächste Übung vor...';
+  setLoadingText('FehlerFix baut deine Übung...', 'Bereite deine nächste Übung vor...');
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 300000); // 5 min
@@ -984,6 +1012,7 @@ async function loadNextExercise() {
     clearTimeout(timer);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      if (handleSessionLost(body)) return;
       throw new Error(body.error || `Server-Fehler (HTTP ${res.status})`);
     }
     const exercise = await res.json();
@@ -1207,7 +1236,7 @@ document.getElementById('btn-check').addEventListener('click', async () => {
   // Sprachausgabe stoppen, falls sie noch läuft
   tts.stop();
   showScreen('loading');
-  document.getElementById('loading-status').textContent = 'KI schaut sich deine Schrift an...';
+  setLoadingText('FehlerFix prüft deine Lösung...', 'Schaue mir deine Schrift genau an...');
   try {
     const raw = engine.toJpeg(0.85);
     const small = await downscaleImage(raw, 1400, 0.8);
@@ -1223,6 +1252,7 @@ document.getElementById('btn-check').addEventListener('click', async () => {
     clearTimeout(timer);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
+      if (handleSessionLost(body)) return;
       throw new Error(body.error || `Server-Fehler (HTTP ${res.status})`);
     }
     const data = await res.json();
