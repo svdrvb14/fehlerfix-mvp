@@ -733,7 +733,7 @@ app.post('/api/next-exercise', async (req, res) => {
     session.lastExercise = exercise;
 
     console.log(
-      `[next-exercise] OK – Typ: ${exercise.type}, Fokus: "${focus}", ` +
+      `[next-exercise] OK – Typ: ${exercise.type}, Fokus: "${focusFeature}", ` +
         `Text-Länge: ${(exercise.correctText || '').length} chars`
     );
     return res.json(exercise);
