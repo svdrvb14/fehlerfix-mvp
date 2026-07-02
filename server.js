@@ -43,6 +43,12 @@ const {
 } = require('./lib/curriculum');
 const { freschMethodPromptBlock } = require('./lib/methods/fresch');
 
+// Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
+const { isDbEnabled } = require('./lib/db');
+const auth = require('./lib/auth');
+const store = require('./lib/store');
+const cookieParser = require('cookie-parser');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -71,6 +77,9 @@ const anthropic = process.env.ANTHROPIC_API_KEY
   : null;
 
 app.use(express.json({ limit: '30mb' }));
+app.use(cookieParser());
+// Hängt req.student an, wenn ein gültiges Session-Cookie da ist (sonst null)
+app.use(auth.attachStudent);
 
 // Request-Logging
 app.use((req, res, next) => {
@@ -97,6 +106,7 @@ app.get('/api/health', (req, res) => {
     apiKeyConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     provider: 'anthropic',
     model: MODEL,
+    authEnabled: isDbEnabled,
     languages: listLanguages(),
     supportedStates: listStateCodes(),
     statesWithDetailedCurriculum: ['HE'],
@@ -126,6 +136,115 @@ app.get('/api/profile/school-forms', (req, res) => {
     schoolForms: forms,
     primaryUpTo: primaryUpTo(state),
   });
+});
+
+// ─────────────────────────────────────────────────────────────
+// AUTH-ROUTEN (nur aktiv wenn Supabase konfiguriert ist)
+// ─────────────────────────────────────────────────────────────
+function requireDb(req, res, next) {
+  if (!isDbEnabled) {
+    return res.status(503).json({
+      error: 'Login ist gerade nicht verfügbar (Datenbank nicht verbunden).',
+      code: 'DB_DISABLED',
+    });
+  }
+  next();
+}
+
+// Serialisiert einen Studenten fürs Frontend (ohne Hashes)
+function publicStudent(s) {
+  return {
+    id: s.id,
+    authMethod: s.auth_method,
+    email: s.email || null,
+    displayName: s.display_name || null,
+    classId: s.class_id || null,
+    profile: s.profile || {},
+  };
+}
+
+// Wer bin ich? (für Auto-Login beim Seitenaufruf)
+app.get('/api/auth/me', (req, res) => {
+  res.json({ authEnabled: isDbEnabled, student: req.student ? publicStudent(req.student) : null });
+});
+
+// E-Mail-Registrierung
+app.post('/api/auth/register-email', requireDb, async (req, res) => {
+  try {
+    const { email, password, profile } = req.body || {};
+    const student = await auth.registerEmail({
+      email,
+      password,
+      profile: normalizeProfile(profile) || {},
+    });
+    auth.setSessionCookie(res, auth.signToken(student));
+    res.json({ student: publicStudent(student) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// E-Mail-Login
+app.post('/api/auth/login-email', requireDb, async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    const student = await auth.loginEmail({ email, password });
+    auth.setSessionCookie(res, auth.signToken(student));
+    res.json({ student: publicStudent(student) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Klassencode-Registrierung (Name + PIN)
+app.post('/api/auth/register-class', requireDb, async (req, res) => {
+  try {
+    const { classCode, displayName, pin } = req.body || {};
+    const student = await auth.registerClassCode({ classCode, displayName, pin });
+    auth.setSessionCookie(res, auth.signToken(student));
+    res.json({ student: publicStudent(student) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Klassencode-Login (Klassencode + Name + PIN)
+app.post('/api/auth/login-class', requireDb, async (req, res) => {
+  try {
+    const { classCode, displayName, pin } = req.body || {};
+    const student = await auth.loginClassCode({ classCode, displayName, pin });
+    auth.setSessionCookie(res, auth.signToken(student));
+    res.json({ student: publicStudent(student) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Klasse beitreten (für eingeloggte E-Mail-Schüler, via Seitenmenü)
+app.post('/api/auth/join-class', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const { classCode } = req.body || {};
+    const { student, className } = await auth.joinClass(req.student.id, classCode);
+    res.json({ student: publicStudent(student), className });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Klassencode nachschlagen (Vorschau Name/Profil vor Registrierung)
+app.get('/api/auth/class/:code', requireDb, async (req, res) => {
+  try {
+    const cls = await auth.findClass(req.params.code);
+    res.json({ classCode: cls.class_code, name: cls.name, grade: cls.grade, schoolType: cls.school_type, state: cls.state });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+  auth.clearSessionCookie(res);
+  res.json({ ok: true });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -201,6 +320,38 @@ function normalizeProfile(p) {
     schoolType,
     state,
     language: String(p.language || '').trim() || DEFAULT_LANGUAGE,
+  };
+}
+
+/**
+ * Zentraler Zugriff auf den Lern-State, egal ob eingeloggt oder Gast.
+ *   - Eingeloggt (Supabase): lädt/speichert persistent aus student_state.
+ *   - Gast (kein Login / keine DB): nutzt das in-memory sessions-Objekt (flüchtig).
+ *
+ * Gibt { state, save, saveProfile, persistent, studentId } zurück.
+ * Die Routen mutieren `state` und rufen am Ende `await save()`.
+ */
+async function resolveState(req, bodySessionId) {
+  if (req.student) {
+    const state = await store.loadStudentState(req.student.id, req.student.profile);
+    return {
+      state,
+      studentId: req.student.id,
+      persistent: true,
+      save: () => store.saveStudentState(req.student.id, state),
+      saveProfile: (p) => store.saveStudentProfile(req.student.id, p),
+      log: (entry) => store.logExercise(req.student.id, entry),
+    };
+  }
+  // Gast-Fallback (flüchtig, überlebt keinen Server-Neustart)
+  const state = getSession(bodySessionId);
+  return {
+    state,
+    studentId: null,
+    persistent: false,
+    save: async () => {},        // Objekt liegt bereits im sessions-Map
+    saveProfile: async () => {},
+    log: async () => {},
   };
 }
 
@@ -481,16 +632,18 @@ async function callClaude({ label, systemPrompt, userContent, maxTokens = 4000, 
 // ─────────────────────────────────────────────────────────────
 app.post('/api/analyze', async (req, res) => {
   const { sessionId, images, profile } = req.body || {};
-  if (!sessionId || !Array.isArray(images) || images.length === 0) {
-    return res.status(400).json({ error: 'sessionId und images sind erforderlich.' });
+  if ((!sessionId && !req.student) || !Array.isArray(images) || images.length === 0) {
+    return res.status(400).json({ error: 'Anmeldung/sessionId und images sind erforderlich.' });
   }
 
-  const session = getSession(sessionId);
+  const ctx = await resolveState(req, sessionId);
+  const session = ctx.state;
   if (profile && typeof profile === 'object') {
     session.profile = normalizeProfile(profile);
+    if (ctx.persistent) await ctx.saveProfile(session.profile);
   }
   const sizesKb = images.map((d) => Math.round((d.length * 0.75) / 1024));
-  console.log(`[analyze] Session: ${sessionId}`);
+  console.log(`[analyze] ${ctx.persistent ? 'Student ' + ctx.studentId : 'Gast ' + sessionId}`);
   console.log(`[analyze] Profil: ${JSON.stringify(session.profile)}`);
   console.log(`[analyze] Bilder empfangen: ${sizesKb.join('kb, ')}kb. Schicke an Claude (${MODEL})...`);
 
@@ -586,6 +739,7 @@ app.post('/api/analyze', async (req, res) => {
         .join(', ')}`
     );
 
+    await ctx.save();
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({
@@ -599,11 +753,12 @@ app.post('/api/analyze', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 app.post('/api/next-exercise', async (req, res) => {
   const { sessionId } = req.body || {};
-  if (!sessionId) return res.status(400).json({ error: 'sessionId erforderlich.' });
+  if (!sessionId && !req.student) return res.status(400).json({ error: 'Anmeldung/sessionId erforderlich.' });
 
-  const session = getSession(sessionId);
+  const ctx = await resolveState(req, sessionId);
+  const session = ctx.state;
   if (!session.featureTable || session.featureTable.length === 0) {
-    // Tritt z.B. nach Server-Neustart auf (In-Memory-State verloren).
+    // Tritt z.B. nach Server-Neustart (Gast) auf (In-Memory-State verloren).
     // code: Frontend leitet damit sauber zum Neustart statt in eine Retry-Sackgasse.
     return res.status(409).json({
       error: 'Noch keine Analyse vorhanden.',
@@ -783,6 +938,7 @@ app.post('/api/next-exercise', async (req, res) => {
       `[next-exercise] OK – Typ: ${exercise.type}, Fokus: "${focusFeature}", ` +
         `Text-Länge: ${(exercise.correctText || '').length} chars`
     );
+    await ctx.save();
     return res.json(exercise);
   } catch (err) {
     return res.status(500).json({
@@ -799,11 +955,12 @@ app.post('/api/next-exercise', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 app.post('/api/submit-exercise', async (req, res) => {
   const { sessionId, image } = req.body || {};
-  if (!sessionId || !image) {
-    return res.status(400).json({ error: 'sessionId und image erforderlich.' });
+  if ((!sessionId && !req.student) || !image) {
+    return res.status(400).json({ error: 'Anmeldung/sessionId und image erforderlich.' });
   }
 
-  const session = getSession(sessionId);
+  const ctx = await resolveState(req, sessionId);
+  const session = ctx.state;
   const last = session.lastExercise;
   if (!last || !last.correctText) {
     return res.status(409).json({
@@ -813,7 +970,7 @@ app.post('/api/submit-exercise', async (req, res) => {
   }
 
   const sizeKb = Math.round((image.length * 0.75) / 1024);
-  console.log(`[submit] Session: ${sessionId}, Bild: ${sizeKb}kb, Fokus: "${session.lastFocusFeature}"`);
+  console.log(`[submit] ${ctx.persistent ? 'Student ' + ctx.studentId : 'Gast ' + sessionId}, Bild: ${sizeKb}kb, Fokus: "${session.lastFocusFeature}"`);
 
   // Vision-Prompt: KI liest die Schrift, vergleicht, bewertet, erkennt neue Features
   const gradeText =
@@ -926,6 +1083,17 @@ app.post('/api/submit-exercise', async (req, res) => {
 
   const pointsToNextLevel = session.level * 100 - session.points;
   const levelProgressPercent = ((session.points % 100) / 100) * 100;
+
+  // Persistieren + (bei eingeloggten Schülern) fürs Lehrer-Dashboard loggen
+  await ctx.save();
+  if (ctx.persistent) {
+    await ctx.log({
+      feature: session.lastFocusFeature,
+      exerciseType: last.type,
+      topic: last.topic || null,
+      score: Math.round(ratio * 100),
+    });
+  }
 
   return res.json({
     points,
