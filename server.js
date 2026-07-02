@@ -107,6 +107,14 @@ app.get('/api/health', (req, res) => {
     provider: 'anthropic',
     model: MODEL,
     authEnabled: isDbEnabled,
+    // Diagnose: zeigt NUR ob/wie lang die Env-Variablen ankommen, nie die Werte selbst
+    envCheck: {
+      SUPABASE_URL: process.env.SUPABASE_URL ? `set (${process.env.SUPABASE_URL.length})` : 'MISSING',
+      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY
+        ? `set (${process.env.SUPABASE_SERVICE_ROLE_KEY.length} chars, startsWith:${process.env.SUPABASE_SERVICE_ROLE_KEY.slice(0, 3)})`
+        : 'MISSING',
+      SESSION_SECRET: process.env.SESSION_SECRET ? 'set' : 'MISSING',
+    },
     languages: listLanguages(),
     supportedStates: listStateCodes(),
     statesWithDetailedCurriculum: ['HE'],
