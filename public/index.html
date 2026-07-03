@@ -34,12 +34,121 @@
       <div class="nav-links">
         <button class="nav-link" data-modal="anleitung">Anleitung</button>
         <button class="nav-link" data-modal="ueber">Über uns</button>
+        <button class="nav-login" id="btn-open-menu" hidden>Menü</button>
       </div>
     </nav>
 
+    <!-- Seitenmenü (Drawer) – Login-Status, Klasse beitreten, Abmelden -->
+    <div class="drawer-overlay" id="drawer-overlay" hidden></div>
+    <aside class="drawer" id="drawer" hidden aria-hidden="true">
+      <div class="drawer-header">
+        <span class="drawer-title">Menü</span>
+        <button class="drawer-close" id="drawer-close" aria-label="Schließen">×</button>
+      </div>
+      <div class="drawer-user" id="drawer-user"></div>
+      <nav class="drawer-nav" id="drawer-nav"></nav>
+    </aside>
+
     <main id="app">
+      <!-- ── SCREEN: Auth (Login / Registrierung) ─────────── -->
+      <section class="screen" id="screen-auth">
+        <div class="auth-wrap">
+          <div class="kicker">Willkommen</div>
+          <h1 class="title-l">Anmelden bei <span class="brand-fehler">Fehler</span><span class="brand-fix">Fix</span></h1>
+
+          <!-- Rollen-Umschalter -->
+          <div class="role-switch">
+            <button class="role-btn active" data-role="student">Ich bin Schüler/in</button>
+            <button class="role-btn" data-role="teacher">Ich bin Lehrer/in</button>
+          </div>
+
+          <!-- ── SCHÜLER ── -->
+          <div class="auth-panel" id="auth-student">
+            <div class="auth-tabs">
+              <button class="auth-tab active" data-authtab="login">Anmelden</button>
+              <button class="auth-tab" data-authtab="register">Neu registrieren</button>
+            </div>
+
+            <!-- Methoden-Wahl -->
+            <div class="method-switch">
+              <button class="method-btn active" data-method="class">Klassencode + PIN</button>
+              <button class="method-btn" data-method="email">E-Mail + Passwort</button>
+            </div>
+
+            <!-- Klassencode-Formular -->
+            <div class="auth-form" id="form-class">
+              <label class="auth-label">Klassencode</label>
+              <input class="auth-input" id="in-class-code" placeholder="z. B. DEMO01" autocapitalize="characters" autocomplete="off" />
+              <label class="auth-label">Dein Name</label>
+              <input class="auth-input" id="in-class-name" placeholder="Vorname" autocomplete="off" />
+              <label class="auth-label">PIN (4–6 Ziffern)</label>
+              <input class="auth-input" id="in-class-pin" type="password" inputmode="numeric" placeholder="••••" autocomplete="off" />
+            </div>
+
+            <!-- E-Mail-Formular (Schüler) -->
+            <div class="auth-form" id="form-email" hidden>
+              <label class="auth-label">E-Mail</label>
+              <input class="auth-input" id="in-email" type="email" placeholder="name@beispiel.de" autocomplete="email" />
+              <label class="auth-label">Passwort</label>
+              <input class="auth-input" id="in-password" type="password" placeholder="mindestens 6 Zeichen" autocomplete="current-password" />
+            </div>
+
+            <div class="auth-error" id="auth-error" hidden></div>
+            <button class="btn-primary btn-lg auth-submit" id="btn-auth-submit">Anmelden →</button>
+          </div>
+
+          <!-- ── LEHRER ── -->
+          <div class="auth-panel" id="auth-teacher" hidden>
+            <div class="auth-tabs">
+              <button class="auth-tab active" data-teachtab="login">Anmelden</button>
+              <button class="auth-tab" data-teachtab="register">Neu registrieren</button>
+            </div>
+            <div class="auth-form">
+              <div id="teacher-name-field" hidden>
+                <label class="auth-label">Dein Name</label>
+                <input class="auth-input" id="in-teacher-name" placeholder="z. B. Frau Müller" autocomplete="name" />
+              </div>
+              <label class="auth-label">E-Mail</label>
+              <input class="auth-input" id="in-teacher-email" type="email" placeholder="name@schule.de" autocomplete="email" />
+              <label class="auth-label">Passwort</label>
+              <input class="auth-input" id="in-teacher-password" type="password" placeholder="mindestens 6 Zeichen" autocomplete="current-password" />
+            </div>
+            <div class="auth-error" id="teacher-error" hidden></div>
+            <button class="btn-primary btn-lg auth-submit" id="btn-teacher-submit">Anmelden →</button>
+          </div>
+
+          <button class="auth-guest" id="btn-guest">Ohne Anmeldung ausprobieren →</button>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Lehrer-Dashboard ─────────────────────── -->
+      <section class="screen" id="screen-teacher-dash">
+        <div class="dash-wrap">
+          <div class="kicker">Klassenraum</div>
+          <h1 class="title-l">Deine Klassen</h1>
+
+          <div class="dash-classes" id="dash-classes"></div>
+
+          <button class="btn-secondary" id="btn-new-class">+ Neue Klasse anlegen</button>
+
+          <!-- Schülerliste einer Klasse -->
+          <div class="dash-students" id="dash-students" hidden>
+            <button class="link-action" id="btn-back-classes">← Zurück zu Klassen</button>
+            <h2 class="title-l" id="dash-class-title">Klasse</h2>
+            <div class="class-code-box" id="dash-class-code"></div>
+            <div id="dash-students-list"></div>
+          </div>
+
+          <!-- Schüler-Detail (Fehlerprofil) -->
+          <div class="dash-detail" id="dash-detail" hidden>
+            <button class="link-action" id="btn-back-students">← Zurück zur Klasse</button>
+            <div id="dash-detail-content"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ── SCREEN 0: Willkommen ─────────────────────────── -->
-      <section class="screen active" id="screen-welcome">
+      <section class="screen" id="screen-welcome">
         <div class="welcome">
           <div class="kicker">Schreib. Versteh. Verbessere.</div>
           <h1 class="title-xl">Willkommen bei <span class="brand-fehler">Fehler</span><span class="brand-fix">Fix</span></h1>

@@ -784,7 +784,19 @@ function downscaleImage(dataUrl, maxWidth = 1200, quality = 0.78) {
 // Screen 0: Welcome → Schreiben
 // ─────────────────────────────────────────────────────────
 document.getElementById('btn-start').addEventListener('click', () => {
-  // Vor dem Schreiben kommt der Profile-Screen (Klassenstufe + Schulform)
+  // Eingeloggte Schüler mit vollständigem Profil (z.B. aus Klassencode) überspringen
+  // den Profil-Screen und gehen direkt zum Schreiben.
+  const p = state.profile || {};
+  const complete = p.grade && p.schoolType && p.state;
+  if (authState.user && authState.user.role === 'student' && complete) {
+    state.selectedTopics = pickRandomTopics(3, p.grade);
+    state.currentTopicIndex = 0;
+    state.capturedImages = [];
+    loadTopic(0);
+    showScreen('write');
+    return;
+  }
+  // Sonst: Profil-Screen (Bundesland + Klassenstufe + Schulform)
   renderProfileScreen();
   showScreen('profile');
 });
@@ -1429,3 +1441,382 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+/* ═══════════════════════════════════════════════════════════
+ * AUTH-FRONTEND: Login/Registrierung, Seitenmenü, Lehrer-Dashboard
+ * ═══════════════════════════════════════════════════════════ */
+
+const authState = { user: null, authEnabled: false };
+
+async function apiJson(url, opts) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Fehler (${res.status})`);
+  return data;
+}
+
+// Nav-Menü-Button sichtbar machen wenn eingeloggt
+function refreshNavForUser() {
+  const menuBtn = document.getElementById('btn-open-menu');
+  if (menuBtn) menuBtn.hidden = !authState.user;
+}
+
+// ─── Init: wer ist eingeloggt? ───
+async function initAuth() {
+  try {
+    const me = await apiJson('/api/auth/me');
+    authState.authEnabled = me.authEnabled;
+    authState.user = me.user || null;
+  } catch (e) {
+    authState.authEnabled = false;
+    authState.user = null;
+  }
+  refreshNavForUser();
+
+  if (authState.user && authState.user.role === 'teacher') {
+    showTeacherDashboard();
+    return;
+  }
+  if (authState.user && authState.user.role === 'student') {
+    // Profil aus Account übernehmen
+    if (authState.user.profile) {
+      state.profile = {
+        grade: authState.user.profile.grade || null,
+        schoolType: authState.user.profile.schoolType || null,
+        state: authState.user.profile.state || null,
+        language: authState.user.profile.language || 'de',
+      };
+    }
+    showScreen('welcome');
+    return;
+  }
+  // Niemand eingeloggt
+  if (authState.authEnabled) {
+    renderAuthScreen();
+    showScreen('auth');
+  } else {
+    showScreen('welcome'); // Gast-Modus (DB aus)
+  }
+}
+
+// ─── Auth-Screen ───
+let authUI = { role: 'student', studentTab: 'login', method: 'class', teacherTab: 'login' };
+
+function renderAuthScreen() {
+  // Rollen
+  document.querySelectorAll('.role-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.role === authUI.role);
+    b.onclick = () => { authUI.role = b.dataset.role; renderAuthScreen(); };
+  });
+  document.getElementById('auth-student').hidden = authUI.role !== 'student';
+  document.getElementById('auth-teacher').hidden = authUI.role !== 'teacher';
+
+  // Schüler-Tabs
+  document.querySelectorAll('#auth-student [data-authtab]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.authtab === authUI.studentTab);
+    b.onclick = () => { authUI.studentTab = b.dataset.authtab; renderAuthScreen(); };
+  });
+  // Methoden
+  document.querySelectorAll('#auth-student [data-method]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.method === authUI.method);
+    b.onclick = () => { authUI.method = b.dataset.method; renderAuthScreen(); };
+  });
+  document.getElementById('form-class').hidden = authUI.method !== 'class';
+  document.getElementById('form-email').hidden = authUI.method !== 'email';
+  document.getElementById('btn-auth-submit').textContent =
+    authUI.studentTab === 'login' ? 'Anmelden →' : 'Registrieren →';
+  document.getElementById('auth-error').hidden = true;
+
+  // Lehrer-Tabs
+  document.querySelectorAll('#auth-teacher [data-teachtab]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.teachtab === authUI.teacherTab);
+    b.onclick = () => { authUI.teacherTab = b.dataset.teachtab; renderAuthScreen(); };
+  });
+  document.getElementById('teacher-name-field').hidden = authUI.teacherTab !== 'register';
+  document.getElementById('btn-teacher-submit').textContent =
+    authUI.teacherTab === 'login' ? 'Anmelden →' : 'Registrieren →';
+  document.getElementById('teacher-error').hidden = true;
+}
+
+function showAuthError(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+// Schüler-Submit
+document.getElementById('btn-auth-submit').addEventListener('click', async () => {
+  const isRegister = authUI.studentTab === 'register';
+  try {
+    let user;
+    if (authUI.method === 'class') {
+      const classCode = document.getElementById('in-class-code').value.trim();
+      const displayName = document.getElementById('in-class-name').value.trim();
+      const pin = document.getElementById('in-class-pin').value.trim();
+      const url = isRegister ? '/api/auth/register-class' : '/api/auth/login-class';
+      ({ user } = await apiJson(url, { method: 'POST', body: JSON.stringify({ classCode, displayName, pin }) }));
+    } else {
+      const email = document.getElementById('in-email').value.trim();
+      const password = document.getElementById('in-password').value;
+      const body = isRegister ? { email, password, profile: state.profile } : { email, password };
+      const url = isRegister ? '/api/auth/register-email' : '/api/auth/login-email';
+      ({ user } = await apiJson(url, { method: 'POST', body: JSON.stringify(body) }));
+    }
+    onLoginSuccess(user);
+  } catch (e) {
+    showAuthError('auth-error', e.message);
+  }
+});
+
+// Lehrer-Submit
+document.getElementById('btn-teacher-submit').addEventListener('click', async () => {
+  const isRegister = authUI.teacherTab === 'register';
+  try {
+    const email = document.getElementById('in-teacher-email').value.trim();
+    const password = document.getElementById('in-teacher-password').value;
+    const displayName = document.getElementById('in-teacher-name').value.trim();
+    const url = isRegister ? '/api/teacher/register' : '/api/teacher/login';
+    const { user } = await apiJson(url, {
+      method: 'POST',
+      body: JSON.stringify({ email, password, displayName }),
+    });
+    onLoginSuccess(user);
+  } catch (e) {
+    showAuthError('teacher-error', e.message);
+  }
+});
+
+// Gast
+document.getElementById('btn-guest').addEventListener('click', () => {
+  showScreen('welcome');
+});
+
+function onLoginSuccess(user) {
+  authState.user = user;
+  refreshNavForUser();
+  if (user.role === 'teacher') {
+    showTeacherDashboard();
+  } else {
+    if (user.profile) {
+      state.profile = {
+        grade: user.profile.grade || null,
+        schoolType: user.profile.schoolType || null,
+        state: user.profile.state || null,
+        language: user.profile.language || 'de',
+      };
+    }
+    showScreen('welcome');
+  }
+}
+
+// ─── Seitenmenü (Drawer) ───
+function openDrawer() {
+  renderDrawer();
+  document.getElementById('drawer-overlay').hidden = false;
+  document.getElementById('drawer').hidden = false;
+}
+function closeDrawer() {
+  document.getElementById('drawer-overlay').hidden = true;
+  document.getElementById('drawer').hidden = true;
+}
+document.getElementById('btn-open-menu').addEventListener('click', openDrawer);
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+
+function renderDrawer() {
+  const u = authState.user;
+  const userBox = document.getElementById('drawer-user');
+  const nav = document.getElementById('drawer-nav');
+  if (!u) { userBox.innerHTML = ''; nav.innerHTML = ''; return; }
+
+  const name = u.displayName || u.email || 'Angemeldet';
+  const meta = u.role === 'teacher' ? 'Lehrkraft' : (u.authMethod === 'email' ? u.email : 'Schüler/in');
+  userBox.innerHTML = `<div class="du-name">${escapeHtml(name)}</div><div class="du-meta">${escapeHtml(meta)}</div>`;
+
+  nav.innerHTML = '';
+  if (u.role === 'teacher') {
+    addDrawerItem(nav, 'Zum Klassenraum', () => { closeDrawer(); showTeacherDashboard(); });
+  } else {
+    // Schüler: Klasse beitreten (nur sinnvoll für E-Mail-Schüler ohne Klasse, aber immer anbieten)
+    const join = document.createElement('div');
+    join.className = 'drawer-join';
+    join.innerHTML = `
+      <input id="drawer-join-code" placeholder="Klassencode" autocomplete="off" />
+      <button class="btn-secondary" id="drawer-join-btn" style="width:100%">Klasse beitreten</button>
+      <div class="drawer-msg" id="drawer-join-msg"></div>`;
+    nav.appendChild(join);
+    join.querySelector('#drawer-join-btn').onclick = async () => {
+      const code = join.querySelector('#drawer-join-code').value.trim();
+      const msg = join.querySelector('#drawer-join-msg');
+      try {
+        const { className } = await apiJson('/api/auth/join-class', {
+          method: 'POST', body: JSON.stringify({ classCode: code }),
+        });
+        msg.className = 'drawer-msg ok';
+        msg.textContent = 'Du bist jetzt in: ' + (className || 'der Klasse');
+      } catch (e) {
+        msg.className = 'drawer-msg err';
+        msg.textContent = e.message;
+      }
+    };
+  }
+  addDrawerItem(nav, 'Abmelden', logout, true);
+}
+
+function addDrawerItem(nav, label, onClick, danger) {
+  const b = document.createElement('button');
+  b.className = 'drawer-item' + (danger ? ' danger' : '');
+  b.textContent = label;
+  b.onclick = onClick;
+  nav.appendChild(b);
+}
+
+async function logout() {
+  try { await apiJson('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+  authState.user = null;
+  refreshNavForUser();
+  closeDrawer();
+  renderAuthScreen();
+  showScreen('auth');
+}
+
+// ─── Lehrer-Dashboard ───
+async function showTeacherDashboard() {
+  showScreen('teacher-dash');
+  document.getElementById('dash-students').hidden = true;
+  document.getElementById('dash-detail').hidden = true;
+  document.querySelector('.dash-classes').hidden = false;
+  document.getElementById('btn-new-class').hidden = false;
+  const wrap = document.getElementById('dash-classes');
+  wrap.innerHTML = '<div class="dash-empty">Lade Klassen…</div>';
+  try {
+    const { classes } = await apiJson('/api/teacher/classes');
+    if (!classes.length) {
+      wrap.innerHTML = '<div class="dash-empty">Noch keine Klassen. Leg deine erste Klasse an!</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    classes.forEach((c) => {
+      const card = document.createElement('div');
+      card.className = 'class-card';
+      card.innerHTML = `
+        <div class="cc-name">${escapeHtml(c.name)}</div>
+        <span class="cc-code">${escapeHtml(c.class_code)}</span>
+        <div class="cc-meta">${c.studentCount} Schüler/in${c.studentCount === 1 ? '' : 'nen'}</div>`;
+      card.onclick = () => showClassStudents(c);
+      wrap.appendChild(card);
+    });
+  } catch (e) {
+    wrap.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById('btn-new-class').addEventListener('click', async () => {
+  const name = prompt('Name der Klasse (z. B. "6b Musterschule"):');
+  if (!name) return;
+  try {
+    const { class: cls } = await apiJson('/api/teacher/classes', {
+      method: 'POST', body: JSON.stringify({ name }),
+    });
+    alert('Klasse angelegt!\n\nKlassencode: ' + cls.class_code + '\n\nGib diesen Code an deine Schüler weiter.');
+    showTeacherDashboard();
+  } catch (e) {
+    alert('Fehler: ' + e.message);
+  }
+});
+
+document.getElementById('btn-back-classes').addEventListener('click', showTeacherDashboard);
+
+async function showClassStudents(cls) {
+  document.querySelector('.dash-classes').hidden = true;
+  document.getElementById('btn-new-class').hidden = true;
+  document.getElementById('dash-detail').hidden = true;
+  const panel = document.getElementById('dash-students');
+  panel.hidden = false;
+  document.getElementById('dash-class-title').textContent = cls.name;
+  document.getElementById('dash-class-code').innerHTML =
+    `Klassencode zum Beitreten: <b>${escapeHtml(cls.class_code)}</b>`;
+  const list = document.getElementById('dash-students-list');
+  list.innerHTML = '<div class="dash-empty">Lade Schüler…</div>';
+  try {
+    const { students } = await apiJson(`/api/teacher/classes/${cls.id}/students`);
+    if (!students.length) {
+      list.innerHTML = '<div class="dash-empty">Noch keine Schüler in dieser Klasse.</div>';
+      return;
+    }
+    list.innerHTML = '';
+    students.forEach((s) => {
+      const weak = (s.topWeaknesses || []).map((w) => w.name).join(', ') || '–';
+      const row = document.createElement('div');
+      row.className = 'student-row';
+      row.innerHTML = `
+        <div>
+          <div class="sr-name">${escapeHtml(s.display_name || s.email || 'Unbenannt')}</div>
+          <div class="sr-weak">Übt gerade: ${escapeHtml(weak)}</div>
+        </div>
+        <div class="sr-stats">
+          <div class="sr-level">Level ${s.level}</div>
+          ${s.exercisesCompleted} Übungen
+        </div>`;
+      row.onclick = () => showStudentDetail(s.id, cls);
+      list.appendChild(row);
+    });
+  } catch (e) {
+    list.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById('btn-back-students').addEventListener('click', () => {
+  document.getElementById('dash-detail').hidden = true;
+  document.getElementById('dash-students').hidden = false;
+});
+
+async function showStudentDetail(studentId, cls) {
+  document.getElementById('dash-students').hidden = true;
+  const panel = document.getElementById('dash-detail');
+  panel.hidden = false;
+  const content = document.getElementById('dash-detail-content');
+  content.innerHTML = '<div class="dash-empty">Lade Fehlerprofil…</div>';
+  try {
+    const { student } = await apiJson(`/api/teacher/students/${studentId}`);
+    const p = student.profile || {};
+    const profileLine = [p.grade ? 'Klasse ' + p.grade : null, p.schoolType, p.state].filter(Boolean).join(' · ');
+    const bars = (student.errorProfile || []).map((f) => {
+      const m = Math.round(f.mastery ?? 0);
+      const color = m < 40 ? 'var(--coral)' : m < 70 ? '#e0a83d' : '#6dbe7a';
+      return `<div class="feature-bar-row">
+        <div class="feature-bar-label"><span>${escapeHtml(f.name)}</span><span>${m}%</span></div>
+        <div class="feature-bar-track"><div class="feature-bar-fill" style="width:${m}%;background:${color}"></div></div>
+      </div>`;
+    }).join('') || '<div class="dash-empty">Noch keine Analyse – Schüler/in hat noch nicht geübt.</div>';
+
+    const recent = (student.recentExercises || []).slice(0, 10).map((r) => {
+      const d = new Date(r.created_at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+      return `<div class="feature-bar-label"><span>${d} · ${escapeHtml(r.feature || r.exercise_type || '–')}</span><span>${r.score ?? '–'}%</span></div>`;
+    }).join('') || '<div class="dash-empty">Noch keine Übungen.</div>';
+
+    content.innerHTML = `
+      <h2 class="title-l">${escapeHtml(student.displayName || student.email || 'Schüler/in')}</h2>
+      <div class="kicker">${escapeHtml(profileLine || '–')}</div>
+      <div class="detail-card" style="margin-top:16px">
+        <div class="stat-kicker stat-kicker-blue">Fortschritt</div>
+        <p>Level <b>${student.level}</b> · ${student.points} Punkte · ${student.exercisesCompleted} Übungen</p>
+      </div>
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Fehlerprofil – Übungsbedarf pro Bereich</div>
+        <div style="margin-top:14px">${bars}</div>
+      </div>
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Letzte Übungen</div>
+        <div style="margin-top:14px">${recent}</div>
+      </div>`;
+  } catch (e) {
+    content.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ─── Start ───
+initAuth();

@@ -78,8 +78,8 @@ const anthropic = process.env.ANTHROPIC_API_KEY
 
 app.use(express.json({ limit: '30mb' }));
 app.use(cookieParser());
-// Hängt req.student an, wenn ein gültiges Session-Cookie da ist (sonst null)
-app.use(auth.attachStudent);
+// Hängt req.student ODER req.teacher an, je nach Session-Cookie (sonst beide null)
+app.use(auth.attachUser);
 
 // Request-Logging
 app.use((req, res, next) => {
@@ -163,6 +163,7 @@ function requireDb(req, res, next) {
 function publicStudent(s) {
   return {
     id: s.id,
+    role: 'student',
     authMethod: s.auth_method,
     email: s.email || null,
     displayName: s.display_name || null,
@@ -171,9 +172,21 @@ function publicStudent(s) {
   };
 }
 
+function publicTeacher(t) {
+  return {
+    id: t.id,
+    role: 'teacher',
+    email: t.email,
+    displayName: t.display_name || null,
+  };
+}
+
 // Wer bin ich? (für Auto-Login beim Seitenaufruf)
 app.get('/api/auth/me', (req, res) => {
-  res.json({ authEnabled: isDbEnabled, student: req.student ? publicStudent(req.student) : null });
+  let user = null;
+  if (req.teacher) user = publicTeacher(req.teacher);
+  else if (req.student) user = publicStudent(req.student);
+  res.json({ authEnabled: isDbEnabled, user });
 });
 
 // E-Mail-Registrierung
@@ -186,7 +199,7 @@ app.post('/api/auth/register-email', requireDb, async (req, res) => {
       profile: normalizeProfile(profile) || {},
     });
     auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ student: publicStudent(student) });
+    res.json({ user: publicStudent(student) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -198,7 +211,7 @@ app.post('/api/auth/login-email', requireDb, async (req, res) => {
     const { email, password } = req.body || {};
     const student = await auth.loginEmail({ email, password });
     auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ student: publicStudent(student) });
+    res.json({ user: publicStudent(student) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -210,7 +223,7 @@ app.post('/api/auth/register-class', requireDb, async (req, res) => {
     const { classCode, displayName, pin } = req.body || {};
     const student = await auth.registerClassCode({ classCode, displayName, pin });
     auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ student: publicStudent(student) });
+    res.json({ user: publicStudent(student) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -222,7 +235,7 @@ app.post('/api/auth/login-class', requireDb, async (req, res) => {
     const { classCode, displayName, pin } = req.body || {};
     const student = await auth.loginClassCode({ classCode, displayName, pin });
     auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ student: publicStudent(student) });
+    res.json({ user: publicStudent(student) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -233,7 +246,7 @@ app.post('/api/auth/join-class', requireDb, auth.requireStudent, async (req, res
   try {
     const { classCode } = req.body || {};
     const { student, className } = await auth.joinClass(req.student.id, classCode);
-    res.json({ student: publicStudent(student), className });
+    res.json({ user: publicStudent(student), className });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -253,6 +266,86 @@ app.get('/api/auth/class/:code', requireDb, async (req, res) => {
 app.post('/api/auth/logout', (req, res) => {
   auth.clearSessionCookie(res);
   res.json({ ok: true });
+});
+
+// ─────────────────────────────────────────────────────────────
+// LEHRER-ROUTEN
+// ─────────────────────────────────────────────────────────────
+
+// Lehrer-Registrierung
+app.post('/api/teacher/register', requireDb, async (req, res) => {
+  try {
+    const { email, password, displayName } = req.body || {};
+    const teacher = await auth.registerTeacher({ email, password, displayName });
+    auth.setSessionCookie(res, auth.signToken(teacher, 'teacher'));
+    res.json({ user: publicTeacher(teacher) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Lehrer-Login
+app.post('/api/teacher/login', requireDb, async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    const teacher = await auth.loginTeacher({ email, password });
+    auth.setSessionCookie(res, auth.signToken(teacher, 'teacher'));
+    res.json({ user: publicTeacher(teacher) });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Meine Klassen (mit Schülerzahl)
+app.get('/api/teacher/classes', requireDb, auth.requireTeacher, async (req, res) => {
+  try {
+    const classes = await store.listTeacherClasses(req.teacher.id);
+    res.json({ classes });
+  } catch (e) {
+    res.status(500).json({ error: 'Klassen konnten nicht geladen werden.' });
+  }
+});
+
+// Neue Klasse anlegen → Klassencode
+app.post('/api/teacher/classes', requireDb, auth.requireTeacher, async (req, res) => {
+  try {
+    const { name, state, schoolType, grade, language } = req.body || {};
+    const cls = await auth.createClassForTeacher(req.teacher.id, {
+      name,
+      state,
+      schoolType,
+      grade: grade ? Number(grade) : null,
+      language,
+    });
+    res.json({ class: cls });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Schüler einer Klasse (mit Kurz-Fortschritt)
+app.get('/api/teacher/classes/:classId/students', requireDb, auth.requireTeacher, async (req, res) => {
+  try {
+    const cls = await store.getTeacherClass(req.teacher.id, req.params.classId);
+    if (!cls) return res.status(403).json({ error: 'Kein Zugriff auf diese Klasse.' });
+    const students = await store.listClassStudents(cls.id);
+    res.json({ class: cls, students });
+  } catch (e) {
+    res.status(500).json({ error: 'Schüler konnten nicht geladen werden.' });
+  }
+});
+
+// Vollständiges Fehlerprofil + Verlauf eines Schülers
+app.get('/api/teacher/students/:studentId', requireDb, auth.requireTeacher, async (req, res) => {
+  try {
+    const allowed = await store.studentBelongsToTeacher(req.params.studentId, req.teacher.id);
+    if (!allowed) return res.status(403).json({ error: 'Kein Zugriff auf diese/n Schüler/in.' });
+    const detail = await store.getStudentDetail(req.params.studentId);
+    if (!detail) return res.status(404).json({ error: 'Schüler/in nicht gefunden.' });
+    res.json({ student: detail });
+  } catch (e) {
+    res.status(500).json({ error: 'Details konnten nicht geladen werden.' });
+  }
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
