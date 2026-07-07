@@ -1346,6 +1346,18 @@ app.post('/api/submit-exercise', async (req, res) => {
   });
 });
 
+// TEMP QA: geschützter Cleanup der ClaudeQA-Testdaten (wird nach dem Test entfernt)
+app.post('/api/admin/cleanup-test-data', requireDb, async (req, res) => {
+  if (req.get('x-admin-secret') !== process.env.SESSION_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    res.json({ ok: true, deleted: await store.deleteClaudeQATestData() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // SPA-Fallback: alle nicht-API GETs → index.html.
 // Middleware-Form (statt app.get('*', ...)) ist robust gegen path-to-regexp-Versionen.
 app.use((req, res, next) => {
