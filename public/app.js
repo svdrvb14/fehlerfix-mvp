@@ -1547,44 +1547,80 @@ function showAuthError(id, msg) {
   el.hidden = false;
 }
 
+// Zeigt eine grüne Erfolgsmeldung im Auth-Fehlerfeld (wird für "bitte anmelden" genutzt)
+function showAuthSuccess(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.hidden = false;
+  el.style.background = '#e6f4e8';
+  el.style.color = '#2a6c34';
+}
+function resetAuthMsgStyle(id) {
+  const el = document.getElementById(id);
+  el.style.background = '';
+  el.style.color = '';
+}
+
 // Schüler-Submit
 document.getElementById('btn-auth-submit').addEventListener('click', async () => {
   const isRegister = authUI.studentTab === 'register';
+  resetAuthMsgStyle('auth-error');
   try {
-    let user;
     if (authUI.method === 'class') {
       const classCode = document.getElementById('in-class-code').value.trim();
       const displayName = document.getElementById('in-class-name').value.trim();
       const pin = document.getElementById('in-class-pin').value.trim();
-      const url = isRegister ? '/api/auth/register-class' : '/api/auth/login-class';
-      ({ user } = await apiJson(url, { method: 'POST', body: JSON.stringify({ classCode, displayName, pin }) }));
+      if (isRegister) {
+        await apiJson('/api/auth/register-class', { method: 'POST', body: JSON.stringify({ classCode, displayName, pin }) });
+        // Nach Registrierung: NICHT einloggen – zum Login-Tab wechseln, Felder behalten
+        afterRegister('auth-error', 'Registrierung erfolgreich! Melde dich jetzt mit deinem Namen und deiner PIN an.');
+        return;
+      }
+      const { user } = await apiJson('/api/auth/login-class', { method: 'POST', body: JSON.stringify({ classCode, displayName, pin }) });
+      onLoginSuccess(user);
     } else {
       const email = document.getElementById('in-email').value.trim();
       const password = document.getElementById('in-password').value;
-      const body = isRegister ? { email, password, profile: state.profile } : { email, password };
-      const url = isRegister ? '/api/auth/register-email' : '/api/auth/login-email';
-      ({ user } = await apiJson(url, { method: 'POST', body: JSON.stringify(body) }));
+      if (isRegister) {
+        await apiJson('/api/auth/register-email', { method: 'POST', body: JSON.stringify({ email, password, profile: state.profile }) });
+        afterRegister('auth-error', 'Registrierung erfolgreich! Melde dich jetzt mit deiner E-Mail an.');
+        return;
+      }
+      const { user } = await apiJson('/api/auth/login-email', { method: 'POST', body: JSON.stringify({ email, password }) });
+      onLoginSuccess(user);
     }
-    onLoginSuccess(user);
   } catch (e) {
+    resetAuthMsgStyle('auth-error');
     showAuthError('auth-error', e.message);
   }
 });
 
+// Nach erfolgreicher Registrierung: auf Login-Tab wechseln, Erfolgsmeldung zeigen
+function afterRegister(errId, msg) {
+  authUI.studentTab = 'login';
+  renderAuthScreen();
+  showAuthSuccess(errId, msg);
+}
+
 // Lehrer-Submit
 document.getElementById('btn-teacher-submit').addEventListener('click', async () => {
   const isRegister = authUI.teacherTab === 'register';
+  resetAuthMsgStyle('teacher-error');
   try {
     const email = document.getElementById('in-teacher-email').value.trim();
     const password = document.getElementById('in-teacher-password').value;
     const displayName = document.getElementById('in-teacher-name').value.trim();
-    const url = isRegister ? '/api/teacher/register' : '/api/teacher/login';
-    const { user } = await apiJson(url, {
-      method: 'POST',
-      body: JSON.stringify({ email, password, displayName }),
-    });
+    if (isRegister) {
+      await apiJson('/api/teacher/register', { method: 'POST', body: JSON.stringify({ email, password, displayName }) });
+      authUI.teacherTab = 'login';
+      renderAuthScreen();
+      showAuthSuccess('teacher-error', 'Registrierung erfolgreich! Melde dich jetzt mit deiner E-Mail an.');
+      return;
+    }
+    const { user } = await apiJson('/api/teacher/login', { method: 'POST', body: JSON.stringify({ email, password }) });
     onLoginSuccess(user);
   } catch (e) {
+    resetAuthMsgStyle('teacher-error');
     showAuthError('teacher-error', e.message);
   }
 });
@@ -1626,7 +1662,7 @@ document.getElementById('btn-open-menu').addEventListener('click', openDrawer);
 document.getElementById('drawer-close').addEventListener('click', closeDrawer);
 document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
 
-function renderDrawer() {
+async function renderDrawer() {
   const u = authState.user;
   const userBox = document.getElementById('drawer-user');
   const nav = document.getElementById('drawer-nav');
@@ -1639,30 +1675,55 @@ function renderDrawer() {
   nav.innerHTML = '';
   if (u.role === 'teacher') {
     addDrawerItem(nav, 'Zum Klassenraum', () => { closeDrawer(); showTeacherDashboard(); });
+    addDrawerItem(nav, 'Abmelden', logout, true);
+    return;
+  }
+
+  // ── Schüler ──
+  // Aktuelle Klasse anzeigen (falls vorhanden); dann Beitreten NUR wenn (noch) keine Klasse.
+  const classInfo = document.createElement('div');
+  classInfo.className = 'drawer-join';
+  classInfo.innerHTML = '<div class="drawer-msg">Lade Klasse…</div>';
+  nav.appendChild(classInfo);
+
+  let currentClass = null;
+  try {
+    const res = await apiJson('/api/auth/my-class');
+    currentClass = res.class;
+  } catch (e) { /* ignorieren */ }
+
+  if (currentClass) {
+    // In einer Klasse → nur Anzeige, KEIN Beitreten-Feld mehr
+    classInfo.innerHTML = `
+      <div class="du-meta" style="margin-bottom:2px">Deine Klasse</div>
+      <div class="du-name">${escapeHtml(currentClass.name || 'Klasse')}</div>
+      <div class="drawer-msg">Code: ${escapeHtml(currentClass.code || '')}</div>`;
   } else {
-    // Schüler: Klasse beitreten (nur sinnvoll für E-Mail-Schüler ohne Klasse, aber immer anbieten)
-    const join = document.createElement('div');
-    join.className = 'drawer-join';
-    join.innerHTML = `
+    // Noch keine Klasse → Beitreten anbieten
+    classInfo.innerHTML = `
+      <div class="du-meta" style="margin-bottom:6px">Einer Klasse beitreten</div>
       <input id="drawer-join-code" placeholder="Klassencode" autocomplete="off" />
       <button class="btn-secondary" id="drawer-join-btn" style="width:100%">Klasse beitreten</button>
       <div class="drawer-msg" id="drawer-join-msg"></div>`;
-    nav.appendChild(join);
-    join.querySelector('#drawer-join-btn').onclick = async () => {
-      const code = join.querySelector('#drawer-join-code').value.trim();
-      const msg = join.querySelector('#drawer-join-msg');
+    classInfo.querySelector('#drawer-join-btn').onclick = async () => {
+      const code = classInfo.querySelector('#drawer-join-code').value.trim();
+      const msg = classInfo.querySelector('#drawer-join-msg');
       try {
-        const { className } = await apiJson('/api/auth/join-class', {
+        const { user, className } = await apiJson('/api/auth/join-class', {
           method: 'POST', body: JSON.stringify({ classCode: code }),
         });
+        authState.user = user; // classId aktualisieren
         msg.className = 'drawer-msg ok';
         msg.textContent = 'Du bist jetzt in: ' + (className || 'der Klasse');
+        // Menü neu rendern → zeigt jetzt die Klasse statt des Beitreten-Felds
+        setTimeout(renderDrawer, 900);
       } catch (e) {
         msg.className = 'drawer-msg err';
         msg.textContent = e.message;
       }
     };
   }
+
   addDrawerItem(nav, 'Abmelden', logout, true);
 }
 

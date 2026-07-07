@@ -193,13 +193,13 @@ app.get('/api/auth/me', (req, res) => {
 app.post('/api/auth/register-email', requireDb, async (req, res) => {
   try {
     const { email, password, profile } = req.body || {};
-    const student = await auth.registerEmail({
+    await auth.registerEmail({
       email,
       password,
       profile: normalizeProfile(profile) || {},
     });
-    auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ user: publicStudent(student) });
+    // KEIN Auto-Login: nach der Registrierung soll sich der Nutzer normal anmelden.
+    res.json({ registered: true });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -221,9 +221,9 @@ app.post('/api/auth/login-email', requireDb, async (req, res) => {
 app.post('/api/auth/register-class', requireDb, async (req, res) => {
   try {
     const { classCode, displayName, pin } = req.body || {};
-    const student = await auth.registerClassCode({ classCode, displayName, pin });
-    auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ user: publicStudent(student) });
+    await auth.registerClassCode({ classCode, displayName, pin });
+    // KEIN Auto-Login: erst anmelden lassen.
+    res.json({ registered: true });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -252,6 +252,16 @@ app.post('/api/auth/join-class', requireDb, auth.requireStudent, async (req, res
   }
 });
 
+// Aktuelle Klasse des eingeloggten Schülers (fürs Menü)
+app.get('/api/auth/my-class', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const cls = await store.getClassBrief(req.student.class_id);
+    res.json({ class: cls ? { id: cls.id, name: cls.name, code: cls.class_code } : null });
+  } catch (e) {
+    res.status(500).json({ error: 'Klasse konnte nicht geladen werden.' });
+  }
+});
+
 // Klassencode nachschlagen (Vorschau Name/Profil vor Registrierung)
 app.get('/api/auth/class/:code', requireDb, async (req, res) => {
   try {
@@ -276,9 +286,9 @@ app.post('/api/auth/logout', (req, res) => {
 app.post('/api/teacher/register', requireDb, async (req, res) => {
   try {
     const { email, password, displayName } = req.body || {};
-    const teacher = await auth.registerTeacher({ email, password, displayName });
-    auth.setSessionCookie(res, auth.signToken(teacher, 'teacher'));
-    res.json({ user: publicTeacher(teacher) });
+    await auth.registerTeacher({ email, password, displayName });
+    // KEIN Auto-Login: erst anmelden lassen.
+    res.json({ registered: true });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
