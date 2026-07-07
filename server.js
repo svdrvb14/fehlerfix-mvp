@@ -313,7 +313,7 @@ app.post('/api/upload-classtest', requireDb, auth.requireStudent, async (req, re
     res.json({ success: true, detectedCount: detected.length, streakDays: session.streakDays || 0 });
   } catch (err) {
     console.error('[classtest] Fehler:', err.message);
-    res.status(500).json({ error: 'Klassenarbeit konnte nicht ausgewertet werden. Versuch es nochmal.' });
+    res.status(500).json({ error: 'Klassenarbeit konnte nicht ausgewertet werden. Versuch es nochmal.', debug: String(err.message).slice(0, 300) });
   }
 });
 
