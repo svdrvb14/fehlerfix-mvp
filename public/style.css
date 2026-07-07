@@ -1782,3 +1782,64 @@ body {
   font-style: italic;
   padding: 20px 0;
 }
+
+/* ─── Schüler-Dashboard ─── */
+.sdash-wrap {
+  max-width: 820px;
+  margin: 20px auto 0;
+  text-align: center;
+}
+.sdash-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 24px 0 28px;
+  text-align: left;
+}
+.sdash-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+.sdash-actions .btn-primary,
+.sdash-actions .btn-secondary {
+  width: 100%;
+}
+.sdash-msg {
+  margin: 16px auto 0;
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+}
+.sdash-msg.ok { background: #e6f4e8; color: #2a6c34; }
+.sdash-msg.err { background: #fde9e7; color: #a8423d; }
+.sdash-msg.info { background: var(--blue-soft); color: var(--blue-medium); }
+@media (max-width: 760px) {
+  .sdash-stats { grid-template-columns: 1fr; }
+}
+
+/* Ausklapp-Button am unteren Rand des Notizbuch-Felds */
+.canvas-expand {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 16px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--blue-medium);
+  cursor: pointer;
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s ease;
+}
+.canvas-expand:hover {
+  background: var(--blue-soft);
+}

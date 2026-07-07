@@ -147,6 +147,44 @@
         </div>
       </section>
 
+      <!-- ── SCREEN: Schüler-Dashboard ────────────────────── -->
+      <section class="screen" id="screen-student-dash">
+        <div class="sdash-wrap">
+          <div class="kicker" id="sdash-greeting">Hallo!</div>
+          <h1 class="title-l">Dein Lernstand</h1>
+
+          <div class="sdash-stats">
+            <div class="stat-card level-card">
+              <div class="level-fire" aria-hidden="true">🔥</div>
+              <div class="stat-kicker">Level</div>
+              <div class="stat-value" id="sdash-level">Level 1</div>
+              <div class="level-progress"><div class="level-progress-fill" id="sdash-level-fill"></div></div>
+              <div class="level-hint" id="sdash-level-hint">Noch 100 Punkte bis Level 2</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-kicker stat-kicker-blue">Streak 🔥</div>
+              <div class="stat-bignum" id="sdash-streak">0</div>
+              <div class="stat-sub" id="sdash-streak-sub">Tage in Folge</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-kicker stat-kicker-blue">Geschaffte Übungen</div>
+              <div class="stat-bignum" id="sdash-exercises">0</div>
+              <div class="stat-sub" id="sdash-points-sub">0 Punkte gesamt</div>
+            </div>
+          </div>
+
+          <div class="sdash-actions">
+            <button class="btn-primary btn-lg" id="btn-sdash-practice">Übung starten →</button>
+            <button class="btn-secondary" id="btn-sdash-classtest">📸 Klassenarbeit hochladen</button>
+            <button class="btn-secondary" id="btn-sdash-reanalyze">Neue Ausgangstexte schreiben</button>
+          </div>
+          <div class="sdash-msg" id="sdash-msg" hidden></div>
+
+          <!-- verstecktes Datei-/Kamera-Input für Klassenarbeit -->
+          <input type="file" id="classtest-input" accept="image/*" capture="environment" hidden />
+        </div>
+      </section>
+
       <!-- ── SCREEN 0: Willkommen ─────────────────────────── -->
       <section class="screen" id="screen-welcome">
         <div class="welcome">
@@ -234,7 +272,7 @@
             <div class="notebook-header">
               <span class="notebook-label">Notizbuch</span>
               <div class="notebook-actions">
-                <button class="link-action" id="btn-clear">Löschen</button>
+                <button class="link-action" id="btn-undo">⌫ Rückgängig</button>
                 <button class="link-action" id="btn-cancel">Abbrechen</button>
               </div>
             </div>
@@ -247,6 +285,7 @@
                 </svg>
                 <span>Zeichne hier deinen Text...</span>
               </div>
+              <button class="canvas-expand" id="btn-expand" title="Mehr Platz">⌄ Mehr Platz</button>
             </div>
             <div class="tool-row">
               <button class="tool-pill active" data-tool="pen" id="tool-pen">✏️ Stift</button>
@@ -314,7 +353,7 @@
             <div class="notebook-header">
               <span class="notebook-label">Dein Heft</span>
               <div class="notebook-actions">
-                <button class="link-action" id="ex-btn-clear">Löschen</button>
+                <button class="link-action" id="ex-btn-undo">⌫ Rückgängig</button>
               </div>
             </div>
             <div class="canvas-wrap">
@@ -326,6 +365,7 @@
                 </svg>
                 <span>Schreibe den Text hier ab...</span>
               </div>
+              <button class="canvas-expand" id="ex-btn-expand" title="Mehr Platz">⌄ Mehr Platz</button>
             </div>
             <div class="tool-row">
               <button class="tool-pill active" data-ex-tool="pen" id="ex-tool-pen">✏️ Stift</button>

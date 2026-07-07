@@ -127,10 +127,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !document.getElementById('modal').hidden) closeModal();
 });
 
-// Brand "FehlerFix" klick → Startseite (Welcome)
+// Brand "FehlerFix" klick → passende Startseite je nach Rolle
 document.getElementById('nav-home').addEventListener('click', () => {
-  // Falls TTS noch läuft (Audio-Diktat), stoppen
   if (typeof tts !== 'undefined' && tts) tts.stop();
+  const u = (typeof authState !== 'undefined') ? authState.user : null;
+  if (u && u.role === 'teacher') { showTeacherDashboard(); return; }
+  if (u && u.role === 'student') { enterStudentApp(); return; }
   showScreen('welcome');
 });
 
@@ -544,8 +546,20 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     }
   }
 
+  // Undo-Historie: vor jedem neuen Strich einen Schnappschuss sichern
+  const history = [];
+  function pushHistory() {
+    try {
+      if (canvasEl.width && canvasEl.height) {
+        history.push(canvasEl.toDataURL('image/png'));
+        if (history.length > 25) history.shift();
+      }
+    } catch (e) { /* ignorieren */ }
+  }
+
   function startDraw(e) {
     e.preventDefault();
+    pushHistory(); // Zustand VOR diesem Strich merken (für Rückgängig)
     drawing = true;
     const { x, y } = pointerPos(e);
     lastX = x;
@@ -622,7 +636,42 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalCompositeOperation = 'source-over';
+    history.length = 0;
     setDrawn(false);
+  }
+
+  // Rückgängig: den letzten Strich entfernen (Zustand vor dem Strich wiederherstellen)
+  function undo() {
+    if (!history.length) {
+      clear();
+      return;
+    }
+    const snap = history.pop();
+    const img = new Image();
+    img.onload = () => {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      ctx.drawImage(img, 0, 0);
+      ctx.restore();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.globalCompositeOperation = 'source-over';
+      if (history.length === 0) setDrawn(false);
+    };
+    img.src = snap;
+  }
+
+  // Mehr Platz: Notizbuch-Höhe schrittweise vergrößern (Inhalt bleibt via resize erhalten)
+  let expandLevel = 0;
+  function expand() {
+    const wrap = canvasEl.parentElement;
+    if (!wrap) return;
+    expandLevel = Math.min(expandLevel + 1, 4);
+    const base = Math.round(window.innerHeight * 0.55);
+    const target = Math.min(base + expandLevel * 150, Math.round(window.innerHeight * 0.92));
+    wrap.style.height = target + 'px';
+    scheduleResize();
   }
 
   // Beim Export ans Vision-Grading: weißer Hintergrund unterlegen, OHNE die CSS-Schullinien.
@@ -641,6 +690,8 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
   return {
     resize,
     clear,
+    undo,
+    expand,
     hasDrawn: () => drawn,
     toJpeg,
     canvasEl,
@@ -811,7 +862,8 @@ const writeEngine = createCanvasEngine({
   eraserBtn: document.getElementById('tool-eraser'),
 });
 
-document.getElementById('btn-clear').addEventListener('click', () => writeEngine.clear());
+document.getElementById('btn-undo').addEventListener('click', () => writeEngine.undo());
+document.getElementById('btn-expand').addEventListener('click', () => writeEngine.expand());
 document.getElementById('btn-cancel').addEventListener('click', () => {
   if (confirm('Wirklich abbrechen? Dein bisheriger Fortschritt geht verloren.')) {
     state.capturedImages = [];
@@ -992,10 +1044,8 @@ function ensureExerciseEngine() {
     penBtn: document.getElementById('ex-tool-pen'),
     eraserBtn: document.getElementById('ex-tool-eraser'),
   });
-  document.getElementById('ex-btn-clear').addEventListener('click', () => {
-    exerciseEngine.clear();
-    document.getElementById('btn-check').disabled = true;
-  });
+  document.getElementById('ex-btn-undo').addEventListener('click', () => exerciseEngine.undo());
+  document.getElementById('ex-btn-expand').addEventListener('click', () => exerciseEngine.expand());
   // Polling: sobald irgendwas gezeichnet wurde, Check-Button aktivieren
   setInterval(() => {
     const btn = document.getElementById('btn-check');
@@ -1481,16 +1531,8 @@ async function initAuth() {
     return;
   }
   if (authState.user && authState.user.role === 'student') {
-    // Profil aus Account übernehmen
-    if (authState.user.profile) {
-      state.profile = {
-        grade: authState.user.profile.grade || null,
-        schoolType: authState.user.profile.schoolType || null,
-        state: authState.user.profile.state || null,
-        language: authState.user.profile.language || 'de',
-      };
-    }
-    showScreen('welcome');
+    applyStudentProfile(authState.user);
+    await enterStudentApp();
     return;
   }
   // Niemand eingeloggt
@@ -1499,6 +1541,32 @@ async function initAuth() {
     showScreen('auth');
   } else {
     showScreen('welcome'); // Gast-Modus (DB aus)
+  }
+}
+
+// Profil aus dem Account ins lokale state übernehmen
+function applyStudentProfile(user) {
+  if (user && user.profile) {
+    state.profile = {
+      grade: user.profile.grade || null,
+      schoolType: user.profile.schoolType || null,
+      state: user.profile.state || null,
+      language: user.profile.language || 'de',
+    };
+  }
+}
+
+// Eingeloggter Schüler: hat er schon eine Analyse → Dashboard, sonst Onboarding
+async function enterStudentApp() {
+  try {
+    const dash = await apiJson('/api/student/dashboard');
+    if (dash.hasAnalysis) {
+      showStudentDashboard(dash);
+    } else {
+      showScreen('welcome'); // noch keine Ausgangstexte → Onboarding
+    }
+  } catch (e) {
+    showScreen('welcome');
   }
 }
 
@@ -1630,21 +1698,14 @@ document.getElementById('btn-guest').addEventListener('click', () => {
   showScreen('welcome');
 });
 
-function onLoginSuccess(user) {
+async function onLoginSuccess(user) {
   authState.user = user;
   refreshNavForUser();
   if (user.role === 'teacher') {
     showTeacherDashboard();
   } else {
-    if (user.profile) {
-      state.profile = {
-        grade: user.profile.grade || null,
-        schoolType: user.profile.schoolType || null,
-        state: user.profile.state || null,
-        language: user.profile.language || 'de',
-      };
-    }
-    showScreen('welcome');
+    applyStudentProfile(user);
+    await enterStudentApp();
   }
 }
 
@@ -1877,6 +1938,101 @@ async function showStudentDetail(studentId, cls) {
   } catch (e) {
     content.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCHÜLER-DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function showStudentDashboard(data) {
+  const u = authState.user;
+  document.getElementById('sdash-greeting').textContent =
+    'Hallo ' + ((u && u.displayName) || (data && data.displayName) || '') + '!';
+  renderStudentDashData(data);
+  showScreen('student-dash');
+}
+
+function renderStudentDashData(d) {
+  if (!d) return;
+  document.getElementById('sdash-level').textContent = 'Level ' + (d.level || 1);
+  const fill = document.getElementById('sdash-level-fill');
+  fill.style.width = '0%';
+  setTimeout(() => { fill.style.width = (d.levelProgressPercent || 0) + '%'; }, 80);
+  document.getElementById('sdash-level-hint').textContent =
+    d.pointsToNextLevel > 0 ? `Noch ${d.pointsToNextLevel} Punkte bis Level ${(d.level || 1) + 1}` : 'Top!';
+  document.getElementById('sdash-streak').textContent = d.streakDays || 0;
+  document.getElementById('sdash-streak-sub').textContent =
+    (d.streakDays === 1 ? 'Tag' : 'Tage') + ' in Folge' + (d.bestStreak ? ` · Best: ${d.bestStreak}` : '');
+  document.getElementById('sdash-exercises').textContent = d.exercisesCompleted || 0;
+  document.getElementById('sdash-points-sub').textContent = (d.points || 0) + ' Punkte gesamt';
+}
+
+async function refreshStudentDashboard() {
+  try {
+    const d = await apiJson('/api/student/dashboard');
+    renderStudentDashData(d);
+  } catch (e) { /* still */ }
+}
+
+function sdashMsg(text, kind) {
+  const el = document.getElementById('sdash-msg');
+  if (!text) { el.hidden = true; return; }
+  el.className = 'sdash-msg ' + (kind || 'info');
+  el.textContent = text;
+  el.hidden = false;
+}
+
+// Übung starten
+document.getElementById('btn-sdash-practice').addEventListener('click', () => {
+  sdashMsg('');
+  loadNextExercise();
+});
+
+// Neue Ausgangstexte schreiben (Onboarding erneut)
+document.getElementById('btn-sdash-reanalyze').addEventListener('click', () => {
+  sdashMsg('');
+  const p = state.profile || {};
+  state.selectedTopics = pickRandomTopics(3, p.grade);
+  state.currentTopicIndex = 0;
+  state.capturedImages = [];
+  loadTopic(0);
+  showScreen('write');
+});
+
+// Klassenarbeit hochladen: Kamera/Datei
+document.getElementById('btn-sdash-classtest').addEventListener('click', () => {
+  document.getElementById('classtest-input').click();
+});
+document.getElementById('classtest-input').addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = ''; // Reset für erneute Auswahl
+  if (!file) return;
+  sdashMsg('Klassenarbeit wird ausgewertet… das dauert einen Moment.', 'info');
+  try {
+    const dataUrl = await fileToDataUrl(file);
+    const small = await downscaleImage(dataUrl, 1400, 0.8);
+    const res = await apiJson('/api/upload-classtest', {
+      method: 'POST',
+      body: JSON.stringify({ image: small }),
+    });
+    sdashMsg(
+      `Fertig! ${res.detectedCount || 0} Übungsfelder aus deiner Klassenarbeit erkannt. ` +
+        `Sie fließen jetzt in deine Übungen ein.`,
+      'ok'
+    );
+    refreshStudentDashboard();
+  } catch (err) {
+    sdashMsg(err.message || 'Das hat nicht geklappt. Versuch es nochmal.', 'err');
+  }
+});
+
+// Hilfsfunktion: File → dataURL
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
 }
 
 // ─── Start ───

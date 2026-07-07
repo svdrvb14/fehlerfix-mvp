@@ -262,6 +262,61 @@ app.get('/api/auth/my-class', requireDb, auth.requireStudent, async (req, res) =
   }
 });
 
+// Schüler-Dashboard: Fortschritt + ob schon eine Analyse existiert
+app.get('/api/student/dashboard', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const st = await store.loadStudentState(req.student.id, req.student.profile);
+    const level = st.level || 1;
+    const points = st.points || 0;
+    res.json({
+      displayName: req.student.display_name || req.student.email || 'Schüler/in',
+      hasAnalysis: (st.featureTable || []).length > 0,
+      level,
+      points,
+      exercisesCompleted: st.exercisesCompleted || 0,
+      streakDays: st.streakDays || 0,
+      bestStreak: st.bestStreak || 0,
+      pointsToNextLevel: level * 100 - points,
+      levelProgressPercent: ((points % 100) / 100) * 100,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Dashboard konnte nicht geladen werden.' });
+  }
+});
+
+// Klassenarbeit-Upload: ein Foto → Fehler erkennen → ins Fehlerprofil mergen
+app.post('/api/upload-classtest', requireDb, auth.requireStudent, async (req, res) => {
+  const { image } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'Bild erforderlich.' });
+  const ctx = await resolveState(req, null);
+  const session = ctx.state;
+  console.log(`[classtest] Student ${ctx.studentId}, Bild ${Math.round((image.length * 0.75) / 1024)}kb`);
+  try {
+    const detected = await detectFeaturesFromImages(
+      session,
+      [image],
+      'Auf dem Bild siehst du eine handgeschriebene Klassenarbeit / einen Test einer Schülerin / eines Schülers.'
+    );
+    if (!session.featureTable || session.featureTable.length === 0) {
+      // Noch keine Analyse → die erkannten Features werden das initiale Profil
+      session.featureTable = detected.length ? detected : [
+        { name: 'Groß-/Kleinschreibung', mastery: 60, right: 0, wrong: 2 },
+      ];
+      session.featureTable.sort((a, b) => a.mastery - b.mastery);
+    } else {
+      mergeDetectedFeatures(session.featureTable, detected);
+    }
+    session.lastFocusFeature = session.featureTable[0]?.name || null;
+    store.bumpStreak(session);
+    await ctx.save();
+    console.log(`[classtest] ${detected.length} Features erkannt/gemergt.`);
+    res.json({ success: true, detectedCount: detected.length, streakDays: session.streakDays || 0 });
+  } catch (err) {
+    console.error('[classtest] Fehler:', err.message);
+    res.status(500).json({ error: 'Klassenarbeit konnte nicht ausgewertet werden. Versuch es nochmal.' });
+  }
+});
+
 // Klassencode nachschlagen (Vorschau Name/Profil vor Registrierung)
 app.get('/api/auth/class/:code', requireDb, async (req, res) => {
   try {
@@ -738,6 +793,74 @@ async function callClaude({ label, systemPrompt, userContent, maxTokens = 4000, 
   throw lastErr;
 }
 
+/**
+ * Schickt Handschrift-Bilder an Claude und liefert eine erkannte Feature-Liste
+ * (Rechtschreib-/Grammatik-Kategorien mit mastery + wrong). Wiederverwendet von
+ * /api/analyze (Onboarding, ersetzt) und /api/upload-classtest (mergt).
+ * Wirft bei Fehler; leere Erkennung → [].
+ */
+async function detectFeaturesFromImages(session, images, introText) {
+  const userContent = [
+    ...images.map(toImageBlock),
+    {
+      type: 'text',
+      text:
+        buildContextBlock(session.profile) + '\n' +
+        introText + '\n' +
+        'Lies die Handschrift sorgfältig. Identifiziere ALLE Rechtschreib-/Grammatik-Fehler ' +
+        'und ordne sie spezifischen, trainierbaren KATEGORIEN (Features) zu.\n\n' +
+        'Beispiele für Feature-Namen: "ie/i-Schreibung", "ss/ß", "Groß-/Kleinschreibung von Nomen", ' +
+        '"Doppelkonsonanten", "Dehnungs-h", "das/dass", "Kommasetzung bei Aufzählungen", ' +
+        '"Zusammen-/Getrenntschreibung", "seid/seit", "wider/wieder", "Endung -ig/-lich".\n\n' +
+        'Antworte AUSSCHLIESSLICH mit JSON in genau diesem Format:\n' +
+        '{ "featureTable": [ { "name": "ie/i-Schreibung", "wrong": 4, "initialMastery": 25, ' +
+        '"examples": ["Tier→Tir"] } ], "totalErrors": 6, "readSuccessfully": true }\n\n' +
+        'Regeln für initialMastery: 4+ Fehler → 15-25, 2-3 → 25-40, 1 → 40-55, ' +
+        'kein Fehler aber typisch für Stufe → 70-85. Sortiere niedrigste mastery zuerst.',
+    },
+  ];
+  const lang = getLanguage(session.profile?.language);
+  const { text } = await callClaude({
+    label: 'analyze',
+    systemPrompt:
+      lang.teacherRole +
+      ' Du analysierst Handschrift-Bilder und baust ein strukturiertes Fehlerprofil. ' +
+      'Du passt deine Erwartungen an die angegebene Klassenstufe an. ' +
+      'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
+    userContent,
+    maxTokens: 4000,
+  });
+  const parsed = parseJsonResponse(text); // wirft bei Parse-Fehler
+  const rawTable = Array.isArray(parsed.featureTable) ? parsed.featureTable : [];
+  return rawTable
+    .map((f) => ({
+      name: String(f.name || '').trim(),
+      mastery: clamp(f.initialMastery != null ? f.initialMastery : f.mastery, 0, 100),
+      right: 0,
+      wrong: clamp(f.wrong || 1, 1, 99),
+    }))
+    .filter((f) => f.name);
+}
+
+/**
+ * Mergt neu erkannte Features (z.B. aus einer Klassenarbeit) in die bestehende
+ * Feature-Table: bekannte Kategorien bekommen mehr Gewicht (wrong hoch, mastery
+ * Richtung erkanntem Wert), neue kommen dazu.
+ */
+function mergeDetectedFeatures(table, detected) {
+  for (const d of detected) {
+    const match = table.find((f) => norm(f.name) === norm(d.name));
+    if (match) {
+      match.wrong = (match.wrong || 0) + (d.wrong || 1);
+      // Mastery Richtung erkanntem Wert ziehen (aber nicht komplett überschreiben)
+      match.mastery = clamp(Math.round((match.mastery + d.mastery) / 2), 0, 100);
+    } else {
+      table.push({ name: d.name, mastery: d.mastery, right: 0, wrong: d.wrong || 1 });
+    }
+  }
+  table.sort((a, b) => a.mastery - b.mastery);
+}
+
 // ─────────────────────────────────────────────────────────────
 // ROUTE 1: /api/analyze – Handschrift → initiale Feature-Table
 // ─────────────────────────────────────────────────────────────
@@ -1191,6 +1314,8 @@ app.post('/api/submit-exercise', async (req, res) => {
     feature: session.lastFocusFeature,
     score: Math.round(ratio * 100),
   });
+  // Streak: heute geübt → Tag zählen (nur bei eingeloggten Schülern persistent)
+  store.bumpStreak(session);
 
   const pointsToNextLevel = session.level * 100 - session.points;
   const levelProgressPercent = ((session.points % 100) / 100) * 100;
@@ -1213,6 +1338,8 @@ app.post('/api/submit-exercise', async (req, res) => {
     pointsToNextLevel,
     levelProgressPercent,
     exercisesCompleted: session.exercisesCompleted,
+    streakDays: session.streakDays || 0,
+    bestStreak: session.bestStreak || 0,
     summary_good: aiGrading?.summary_good || [],
     word_corrections: Array.isArray(aiGrading?.word_corrections) ? aiGrading.word_corrections : [],
     explanation: last.explanation || '',
