@@ -1219,6 +1219,20 @@ app.post('/api/submit-exercise', async (req, res) => {
   });
 });
 
+// Temporärer, geschützter Cleanup-Endpoint für QA-Testdaten (Marker "ClaudeQA").
+// Nur mit korrektem SESSION_SECRET im Header aufrufbar. Wird nach dem Test entfernt.
+app.post('/api/admin/cleanup-test-data', requireDb, async (req, res) => {
+  if (req.get('x-admin-secret') !== process.env.SESSION_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  try {
+    const counts = await store.deleteClaudeQATestData();
+    res.json({ ok: true, deleted: counts });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // SPA-Fallback: alle nicht-API GETs → index.html.
 // Middleware-Form (statt app.get('*', ...)) ist robust gegen path-to-regexp-Versionen.
 app.use((req, res, next) => {
