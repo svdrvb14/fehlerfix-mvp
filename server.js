@@ -1346,6 +1346,13 @@ app.post('/api/submit-exercise', async (req, res) => {
   });
 });
 
+// TEMP QA: prüft ob Migration 0002 (Streak-Spalten) gelaufen ist
+app.get('/api/admin/migration-check', requireDb, async (req, res) => {
+  const { supabase } = require('./lib/db');
+  const r = await supabase.from('student_state').select('streak_days').limit(1);
+  res.json({ streakColumnExists: !r.error, error: r.error?.message || null });
+});
+
 // TEMP QA: geschützter Cleanup der ClaudeQA-Testdaten (wird nach dem Test entfernt)
 app.post('/api/admin/cleanup-test-data', requireDb, async (req, res) => {
   if (req.get('x-admin-secret') !== process.env.SESSION_SECRET) {
