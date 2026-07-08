@@ -313,7 +313,7 @@ app.post('/api/upload-classtest', requireDb, auth.requireStudent, async (req, re
     res.json({ success: true, detectedCount: detected.length, streakDays: session.streakDays || 0 });
   } catch (err) {
     console.error('[classtest] Fehler:', err.message);
-    res.status(500).json({ error: 'Klassenarbeit konnte nicht ausgewertet werden. Versuch es nochmal.', debug: String(err.message).slice(0, 300) });
+    res.status(500).json({ error: 'Klassenarbeit konnte nicht ausgewertet werden. Versuch es nochmal.' });
   }
 });
 
@@ -1344,25 +1344,6 @@ app.post('/api/submit-exercise', async (req, res) => {
     word_corrections: Array.isArray(aiGrading?.word_corrections) ? aiGrading.word_corrections : [],
     explanation: last.explanation || '',
   });
-});
-
-// TEMP QA: prüft ob Migration 0002 (Streak-Spalten) gelaufen ist
-app.get('/api/admin/migration-check', requireDb, async (req, res) => {
-  const { supabase } = require('./lib/db');
-  const r = await supabase.from('student_state').select('streak_days').limit(1);
-  res.json({ streakColumnExists: !r.error, error: r.error?.message || null });
-});
-
-// TEMP QA: geschützter Cleanup der ClaudeQA-Testdaten (wird nach dem Test entfernt)
-app.post('/api/admin/cleanup-test-data', requireDb, async (req, res) => {
-  if (req.get('x-admin-secret') !== process.env.SESSION_SECRET) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  try {
-    res.json({ ok: true, deleted: await store.deleteClaudeQATestData() });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
 });
 
 // SPA-Fallback: alle nicht-API GETs → index.html.
