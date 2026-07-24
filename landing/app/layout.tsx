@@ -13,12 +13,12 @@ export const metadata: Metadata = {
   title: "FehlerFix – Rechtschreibung, die endlich Sinn ergibt",
   description:
     "FehlerFix erkennt Rechtschreibfehler direkt aus der Handschrift auf dem iPad und erklärt die Regel dahinter – statt nur rot anzustreichen. Jetzt für die Warteliste vormerken.",
-  metadataBase: new URL("https://fehlerfix.de"),
+  metadataBase: new URL("https://fehlerfix.com"),
   openGraph: {
     title: "FehlerFix – Rechtschreibung, die endlich Sinn ergibt",
     description:
       "KI-gestützte Rechtschreib-Lern-App fürs iPad mit Apple Pencil. Erkennt Fehler in der Handschrift und erklärt die Regel dahinter.",
-    url: "https://fehlerfix.de",
+    url: "https://fehlerfix.com",
     siteName: "FehlerFix",
     locale: "de_DE",
     type: "website",
