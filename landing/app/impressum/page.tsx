@@ -24,9 +24,9 @@ export default function ImpressumPage() {
           FehlerFix GmbH (in Gründung)
           <br />
           {/* PLATZHALTER: echte Straße, Hausnummer, PLZ, Ort eintragen */}
-          [Straße und Hausnummer]
+
           <br />
-          [PLZ] [Ort]
+          Wiesbaden
           <br />
           Deutschland
         </p>
@@ -93,7 +93,6 @@ export default function ImpressumPage() {
           Salvador Elsen
           <br />
           {/* PLATZHALTER: gleiche Anschrift wie oben */}
-          [Straße und Hausnummer], [PLZ] [Ort]
         </p>
       </section>
 
