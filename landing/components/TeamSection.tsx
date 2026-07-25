@@ -1,13 +1,28 @@
 import Image from "next/image";
 import { AccentDot, BackgroundBlob } from "./BackgroundBlob";
-import { LaurelIcon } from "./LaurelIcon";
+import { LinkedInIcon } from "./LinkedInIcon";
 import { ScrollReveal } from "./ScrollReveal";
 
 const team = [
-  { name: "Salvador Elsen", role: "CFO & CTO" },
-  { name: "Mariam Barry", role: "CEO & CAO" },
-  { name: "Blanca Ostrowicz", role: "COO & CMO" },
+  {
+    name: "Salvador Elsen",
+    role: "CFO & CTO",
+    linkedin: "https://www.linkedin.com/in/salvador-elsen-659673397/",
+  },
+  {
+    name: "Mariam Barry",
+    role: "CEO & CAO",
+    linkedin: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
+  },
+  {
+    name: "Blanca Ostrowicz",
+    role: "COO & CMO",
+    linkedin: "https://www.linkedin.com/in/blanca-maria-ostrowicz-a443993a7/",
+  },
 ];
+
+const companyLinkedin =
+  "https://www.linkedin.com/company/linkedin.com-fehlerfix/?viewAsMember=true";
 
 export function TeamSection() {
   return (
@@ -55,11 +70,30 @@ export function TeamSection() {
           </p>
         </ScrollReveal>
 
-        <ScrollReveal delay={0.24} className="mt-6">
-          <span className="inline-flex items-center gap-2 rounded-full bg-coral-light px-5 py-2.5 text-sm font-semibold text-coral">
-            <LaurelIcon className="h-5 w-5" />
-            Business@School Sieger 2026
-          </span>
+        <ScrollReveal delay={0.24} className="mt-5">
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            {team.map((member) => (
+              <a
+                key={member.name}
+                href={member.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${member.name} auf LinkedIn`}
+                className="text-ink/50 transition hover:text-blue"
+              >
+                <LinkedInIcon className="h-6 w-6" />
+              </a>
+            ))}
+          </div>
+          <a
+            href={companyLinkedin}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue hover:underline"
+          >
+            <LinkedInIcon className="h-4 w-4" />
+            FehlerFix auf LinkedIn
+          </a>
         </ScrollReveal>
       </div>
     </section>
