@@ -77,6 +77,9 @@ export function WaitlistForm({ className = "" }: { className?: string }) {
   return (
     <div className={className}>
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
+        <p className="text-center text-base font-bold text-ink">
+          FehlerFix geht bald live!
+        </p>
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 text-left">
             <label
