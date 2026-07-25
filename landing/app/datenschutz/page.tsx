@@ -26,7 +26,9 @@ export default function DatenschutzPage() {
           FehlerFix GmbH (in Gründung)
           {/* PLATZHALTER: echte Anschrift eintragen, siehe Impressum */}
           <br />
-          [Straße und Hausnummer], [PLZ] [Ort]
+          Wiesbaden
+          <br />
+          Deutschland
           <br />
           E-Mail:{" "}
           <a
