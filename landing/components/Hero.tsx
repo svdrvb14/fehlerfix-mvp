@@ -20,7 +20,7 @@ export function Hero() {
       <AccentDot color="blue" className="right-32 top-52 h-2 w-2" />
 
       <header className="mx-auto flex max-w-6xl items-center">
-        <div className="relative aspect-[550/424] w-[160px] sm:w-[200px]">
+        <div className="relative aspect-[550/459] w-[160px] sm:w-[200px]">
           <Image
             src="/logo.png"
             alt="FehlerFix Logo"
