@@ -20,13 +20,13 @@ export function Hero() {
       <AccentDot color="blue" className="right-32 top-52 h-2 w-2" />
 
       <header className="mx-auto flex max-w-6xl items-center">
-        <div className="relative aspect-[4/5] w-[140px] sm:w-[170px]">
+        <div className="relative aspect-[554/472] w-[160px] sm:w-[200px]">
           <Image
             src="/logo.png"
             alt="FehlerFix Logo"
             fill
             priority
-            sizes="170px"
+            sizes="200px"
             className="object-contain object-left"
           />
         </div>
@@ -36,10 +36,13 @@ export function Hero() {
         <h1 className="text-balance font-poppins text-4xl font-bold leading-tight text-ink sm:text-5xl md:text-6xl">
           Rechtschreibung, die endlich Sinn ergibt.
         </h1>
-        <p className="mx-auto mt-6 max-w-xl text-balance text-lg text-ink/70 sm:text-xl">
-          <Wordmark className="font-semibold" /> erkennt Rechtschreibfehler
-          direkt aus der Handschrift mit dem Apple Pencil auf dem iPad – und
-          erklärt die Regel dahinter, statt nur rot anzustreichen.
+        <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-ink/70 sm:text-xl">
+          <Wordmark className="font-semibold" /> erkennt Rechtschreibfehler,
+          Grammatik und Zeichensetzung direkt aus der Handschrift.{" "}
+          <Wordmark className="font-semibold" /> korrigiert Texte, erstellt
+          ein Fehlerprofil und entwickelt mit Hilfe eines maßgeschneiderten
+          Algorithmus individuelle und genau auf dich zugeschnittene
+          Übungen, damit die Rechtschreibung endlich sitzt!
         </p>
 
         <div className="mx-auto mt-10 max-w-lg">
