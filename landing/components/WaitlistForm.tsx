@@ -87,9 +87,11 @@ export function WaitlistForm({ className = "" }: { className?: string }) {
         <button
           type="submit"
           disabled={status === "loading"}
-          className="whitespace-nowrap rounded-full bg-coral px-7 py-3.5 font-semibold text-white shadow-md transition hover:bg-coral/90 disabled:cursor-not-allowed disabled:opacity-70"
+          className="rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition hover:bg-coral/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          {status === "loading" ? "Wird gesendet…" : "Jetzt vormerken"}
+          {status === "loading"
+            ? "Wird gesendet…"
+            : "Jetzt für exklusiven Pre-Access registrieren"}
         </button>
       </form>
       {validationError && (
