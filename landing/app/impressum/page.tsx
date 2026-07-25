@@ -51,10 +51,10 @@ export default function ImpressumPage() {
         <p className="mt-3">
           E-Mail:{" "}
           <a
-            href="mailto:contact.teamfehlerfix@gmail.com"
+            href="mailto:contact.us@fehlerfix.com"
             className="text-blue hover:underline"
           >
-            contact.teamfehlerfix@gmail.com
+            contact.us@fehlerfix.com
           </a>
         </p>
       </section>

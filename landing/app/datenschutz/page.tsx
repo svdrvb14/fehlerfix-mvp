@@ -32,10 +32,10 @@ export default function DatenschutzPage() {
           <br />
           E-Mail:{" "}
           <a
-            href="mailto:contact.teamfehlerfix@gmail.com"
+            href="mailto:contact.us@fehlerfix.com"
             className="text-blue hover:underline"
           >
-            contact.teamfehlerfix@gmail.com
+            contact.us@fehlerfix.com
           </a>
         </p>
       </section>
@@ -81,10 +81,10 @@ export default function DatenschutzPage() {
           <strong>Widerruf:</strong> Du kannst deine Einwilligung jederzeit
           mit Wirkung für die Zukunft widerrufen, indem du uns eine E-Mail an{" "}
           <a
-            href="mailto:contact.teamfehlerfix@gmail.com"
+            href="mailto:contact.us@fehlerfix.com"
             className="text-blue hover:underline"
           >
-            contact.teamfehlerfix@gmail.com
+            contact.us@fehlerfix.com
           </a>{" "}
           schickst. Die Rechtmäßigkeit der bis zum Widerruf erfolgten
           Verarbeitung bleibt davon unberührt.
