@@ -93,6 +93,12 @@ export default function ImpressumPage() {
           Salvador Elsen
           <br />
           {/* PLATZHALTER: gleiche Anschrift wie oben */}
+          <a
+            href="mailto:salvador.elsen@fehlerfix.com"
+            className="text-blue hover:underline"
+          >
+            salvador.elsen@fehlerfix.com
+          </a>
         </p>
       </section>
 
