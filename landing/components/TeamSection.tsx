@@ -10,14 +10,14 @@ const team = [
     linkedin: "https://www.linkedin.com/in/salvador-elsen-659673397/",
   },
   {
-    name: "Mariam Barry",
-    role: "CEO & CAO",
-    linkedin: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
-  },
-  {
     name: "Blanca Ostrowicz",
     role: "COO & CMO",
     linkedin: "https://www.linkedin.com/in/blanca-maria-ostrowicz-a443993a7/",
+  },
+  {
+    name: "Mariam Barry",
+    role: "CEO & CAO",
+    linkedin: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
   },
 ];
 
@@ -71,17 +71,17 @@ export function TeamSection() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.24} className="mt-5">
-          <div className="flex flex-wrap items-center justify-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
             {team.map((member) => (
               <a
                 key={member.name}
                 href={member.linkedin}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label={`${member.name} auf LinkedIn`}
-                className="text-ink/50 transition hover:text-blue"
+                className="flex items-center gap-2 text-ink/60 transition hover:text-blue"
               >
-                <LinkedInIcon className="h-6 w-6" />
+                <LinkedInIcon className="h-5 w-5 shrink-0" />
+                <span className="text-sm font-medium">{member.name}</span>
               </a>
             ))}
           </div>
