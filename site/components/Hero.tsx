@@ -14,6 +14,13 @@ export function Hero() {
           anzustreichen, erklärt FehlerFix die Regel dahinter.
         </p>
 
+        <p className="mx-auto mt-8 max-w-2xl text-balance text-lg text-ink/70 sm:text-xl">
+          FehlerFix erkennt Rechtschreibfehler, Grammatik und Zeichensetzung
+          direkt aus der Handschrift. Die App korrigiert Texte, erstellt ein
+          Fehlerprofil und entwickelt mit Hilfe eines maßgeschneiderten
+          Algorithmus individuelle und genau auf dich zugeschnittene Übungen.
+        </p>
+
         <div className="mt-10 flex flex-col items-center gap-3">
           <a
             href="#preise"
@@ -22,7 +29,7 @@ export function Hero() {
             Jetzt abonnieren
           </a>
           <p className="text-sm text-ink/50">
-            Fürs iPad · DACH-Raum
+            Für jedes Alter, ab der zweiten Klasse
           </p>
         </div>
       </div>

@@ -14,11 +14,6 @@ export const FEHLERFIX_LINKEDIN_URL = "#";
 
 const team = [
   {
-    name: "Mariam Barry",
-    role: "CEO & CAO",
-    linkedin: TEAM_LINKEDIN.mariam,
-  },
-  {
     name: "Salvador Elsen",
     role: "CFO & CTO",
     linkedin: TEAM_LINKEDIN.salvador,
@@ -27,6 +22,11 @@ const team = [
     name: "Blanca Ostrowicz",
     role: "COO & CMO",
     linkedin: TEAM_LINKEDIN.blanca,
+  },
+  {
+    name: "Mariam Barry",
+    role: "CEO & CAO",
+    linkedin: TEAM_LINKEDIN.mariam,
   },
 ];
 

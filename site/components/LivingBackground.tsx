@@ -3,11 +3,11 @@
 import {
   motion,
   useReducedMotion,
-  useTime,
+  useScroll,
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 
 type ShapeColor = "coral" | "blue" | "green";
 
@@ -16,16 +16,17 @@ type ShapeConfig = {
   kind: "blob" | "dot";
   color: ShapeColor;
   style: CSSProperties;
-  // Jede Form wandert mit eigener Amplitude (relativ zur Viewport-Größe)
-  // und zwei überlagerten Perioden pro Achse, damit die Bahn wie ein freies
-  // Wandern über die ganze Fläche wirkt statt wie eine geschlossene
-  // Kreisbahn um die eigene Achse.
-  ampXRatio: number;
-  ampYRatio: number;
-  periodX1: number;
-  periodY1: number;
-  periodX2: number;
-  periodY2: number;
+  // Bewegungsspielraum in Pixeln, symmetrisch um die Ruheposition. Für die
+  // zwei großen Kreise (Blobs) ist er so gewählt, dass sie nie mehr als
+  // ~45% aus dem Bildschirm ragen (Vorgabe: max. 50%) und sich – da sie in
+  // gegenüberliegenden Ecken verankert sind – niemals überschneiden können.
+  // Für die kleinen Punkte ist er so klein, dass sie bei jeder
+  // Bildschirmgröße immer vollständig sichtbar bleiben.
+  amp: number;
+  freqX: number;
+  freqY: number;
+  freqX2: number;
+  freqY2: number;
   phase: number;
 };
 
@@ -41,6 +42,9 @@ const DOT_COLOR: Record<ShapeColor, string> = {
   green: "bg-green",
 };
 
+const BLOB_AMP = 40; // px – Blob bleibt bei 38rem/34rem Größe klar unter 50% Bleed
+const DOT_AMP = 15; // px – Punkte bleiben auch bei schmalen Viewports voll sichtbar
+
 // Die zwei großen Kreise (Koralle oben rechts, Hellblau unten links, beide
 // bleeding über den Rand) und die drei kleinen Akzent-Punkte – exakt fünf
 // Elemente, fix im DOM verankert. Es werden nie mehr erzeugt.
@@ -55,12 +59,11 @@ const SHAPES: ShapeConfig[] = [
       width: "min(38rem, 92vw)",
       height: "min(38rem, 92vw)",
     },
-    ampXRatio: 0.34,
-    ampYRatio: 0.3,
-    periodX1: 26000,
-    periodY1: 32000,
-    periodX2: 41000,
-    periodY2: 37000,
+    amp: BLOB_AMP,
+    freqX: 0.0012,
+    freqY: 0.0009,
+    freqX2: 0.0021,
+    freqY2: 0.0016,
     phase: 0,
   },
   {
@@ -73,12 +76,11 @@ const SHAPES: ShapeConfig[] = [
       width: "min(34rem, 88vw)",
       height: "min(34rem, 88vw)",
     },
-    ampXRatio: 0.3,
-    ampYRatio: 0.34,
-    periodX1: 29000,
-    periodY1: 24000,
-    periodX2: 44000,
-    periodY2: 39000,
+    amp: BLOB_AMP,
+    freqX: 0.0008,
+    freqY: 0.0013,
+    freqX2: 0.0017,
+    freqY2: 0.0024,
     phase: 1.3,
   },
   {
@@ -91,12 +93,11 @@ const SHAPES: ShapeConfig[] = [
       width: "0.9rem",
       height: "0.9rem",
     },
-    ampXRatio: 0.4,
-    ampYRatio: 0.38,
-    periodX1: 14000,
-    periodY1: 18000,
-    periodX2: 23000,
-    periodY2: 20000,
+    amp: DOT_AMP,
+    freqX: 0.002,
+    freqY: 0.0016,
+    freqX2: 0.0032,
+    freqY2: 0.0027,
     phase: 2.1,
   },
   {
@@ -109,12 +110,11 @@ const SHAPES: ShapeConfig[] = [
       width: "0.7rem",
       height: "0.7rem",
     },
-    ampXRatio: 0.42,
-    ampYRatio: 0.36,
-    periodX1: 19000,
-    periodY1: 15500,
-    periodX2: 27000,
-    periodY2: 24000,
+    amp: DOT_AMP,
+    freqX: 0.0017,
+    freqY: 0.0021,
+    freqX2: 0.0029,
+    freqY2: 0.0035,
     phase: 0.6,
   },
   {
@@ -127,80 +127,60 @@ const SHAPES: ShapeConfig[] = [
       width: "1rem",
       height: "1rem",
     },
-    ampXRatio: 0.38,
-    ampYRatio: 0.4,
-    periodX1: 21000,
-    periodY1: 17000,
-    periodX2: 33000,
-    periodY2: 29000,
+    amp: DOT_AMP,
+    freqX: 0.0022,
+    freqY: 0.0011,
+    freqX2: 0.0034,
+    freqY2: 0.0019,
     phase: 3.4,
   },
 ];
 
-function useViewportSize() {
-  const [size, setSize] = useState({ width: 1280, height: 800 });
-
-  useEffect(() => {
-    function update() {
-      setSize({ width: window.innerWidth, height: window.innerHeight });
-    }
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return size;
-}
-
-function useWanderingAxis(
-  time: MotionValue<number>,
-  viewportSize: number,
-  ampRatio: number,
-  periodA: number,
-  periodB: number,
+// Zwei überlagerte Sinuswellen mit Gewichten, die sich zu 1 summieren – das
+// Ergebnis bleibt dadurch immer exakt innerhalb von [-amp, +amp], egal wie
+// die Wellen sich überlagern. So ist die Bewegungsgrenze mathematisch
+// garantiert und nicht nur "meistens" eingehalten.
+function useScrollAxis(
+  scrollY: MotionValue<number>,
+  amp: number,
+  freqA: number,
+  freqB: number,
   phase: number,
   scale: number
 ) {
-  const amp = ampRatio * viewportSize * scale;
-  const freqA = (2 * Math.PI) / periodA;
-  const freqB = (2 * Math.PI) / periodB;
-
-  return useTransform(time, (t) => {
-    return (
-      Math.sin(t * freqA + phase) * amp * 0.62 +
-      Math.sin(t * freqB + phase * 1.8) * amp * 0.38
-    );
+  const boundedAmp = amp * scale;
+  return useTransform(scrollY, (value) => {
+    const wave =
+      Math.sin(value * freqA + phase) * 0.65 +
+      Math.sin(value * freqB + phase * 1.8) * 0.35;
+    return wave * boundedAmp;
   });
 }
 
 function MovingShape({
   shape,
-  time,
-  viewport,
+  scrollY,
   reducedMotion,
   scale,
 }: {
   shape: ShapeConfig;
-  time: MotionValue<number>;
-  viewport: { width: number; height: number };
+  scrollY: MotionValue<number>;
   reducedMotion: boolean;
   scale: number;
 }) {
-  const x = useWanderingAxis(
-    time,
-    viewport.width,
-    shape.ampXRatio,
-    shape.periodX1,
-    shape.periodX2,
+  const x = useScrollAxis(
+    scrollY,
+    shape.amp,
+    shape.freqX,
+    shape.freqX2,
     shape.phase,
     scale
   );
-  const y = useWanderingAxis(
-    time,
-    viewport.height,
-    shape.ampYRatio,
-    shape.periodY1,
-    shape.periodY2,
+  const y = useScrollAxis(
+    scrollY,
+    shape.amp,
+    shape.freqY,
+    shape.freqY2,
     shape.phase,
     scale
   );
@@ -228,8 +208,7 @@ function MovingShape({
 
 export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
   const shouldReduceMotion = useReducedMotion();
-  const time = useTime();
-  const viewport = useViewportSize();
+  const { scrollY } = useScroll();
   const scale = subtle ? 0.55 : 1;
 
   return (
@@ -243,8 +222,7 @@ export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
         <MovingShape
           key={shape.key}
           shape={shape}
-          time={time}
-          viewport={viewport}
+          scrollY={scrollY}
           reducedMotion={Boolean(shouldReduceMotion)}
           scale={scale}
         />
