@@ -8,17 +8,11 @@ export function Hero() {
           Rechtschreibung, die endlich Sinn ergibt.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-balance text-lg text-ink/70 sm:text-xl">
-          <Wordmark className="font-semibold" /> erkennt Rechtschreibfehler
-          direkt aus der Handschrift auf dem iPad – mit dem Apple Pencil
-          geschrieben, von einer KI analysiert. Statt den Fehler nur rot
-          anzustreichen, erklärt FehlerFix die Regel dahinter.
-        </p>
-
-        <p className="mx-auto mt-8 max-w-2xl text-balance text-lg text-ink/70 sm:text-xl">
-          FehlerFix erkennt Rechtschreibfehler, Grammatik und Zeichensetzung
-          direkt aus der Handschrift. Die App korrigiert Texte, erstellt ein
-          Fehlerprofil und entwickelt mit Hilfe eines maßgeschneiderten
-          Algorithmus individuelle und genau auf dich zugeschnittene Übungen.
+          <Wordmark className="font-semibold" /> erkennt Rechtschreibfehler,
+          Grammatik und Zeichensetzung direkt aus der Handschrift. Die App
+          korrigiert Texte, erstellt ein Fehlerprofil und entwickelt mit
+          Hilfe eines maßgeschneiderten Algorithmus individuelle und genau
+          auf dich zugeschnittene Übungen.
         </p>
 
         <div className="mt-10 flex flex-col items-center gap-3">

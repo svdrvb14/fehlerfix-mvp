@@ -7,22 +7,26 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type ShapeColor = "coral" | "blue" | "green";
+type Unit = "rem" | "vw";
+type OffsetSpec = { unit: Unit; value: number };
 
 type ShapeConfig = {
   key: string;
   kind: "blob" | "dot";
   color: ShapeColor;
   style: CSSProperties;
-  // Bewegungsspielraum in Pixeln, symmetrisch um die Ruheposition. Für die
-  // zwei großen Kreise (Blobs) ist er so gewählt, dass sie nie mehr als
-  // ~45% aus dem Bildschirm ragen (Vorgabe: max. 50%) und sich – da sie in
-  // gegenüberliegenden Ecken verankert sind – niemals überschneiden können.
-  // Für die kleinen Punkte ist er so klein, dass sie bei jeder
-  // Bildschirmgröße immer vollständig sichtbar bleiben.
-  amp: number;
+  // Für die Bewegungsgrenzen wird jede Achse als "Abstand zur nächsten
+  // Kante" beschrieben (in rem oder vw) – daraus wird zur Laufzeit anhand
+  // der echten Fensterbreite ein Bewegungsspielraum in Pixeln berechnet.
+  xOffset: OffsetSpec;
+  xDir: "left" | "right";
+  yOffset: OffsetSpec;
+  yDir: "top" | "bottom";
+  sizeRem?: number; // nur Blobs: Basis für die 50%-Bleed-Grenze
+  sizeVwFrac?: number;
   freqX: number;
   freqY: number;
   freqX2: number;
@@ -42,9 +46,6 @@ const DOT_COLOR: Record<ShapeColor, string> = {
   green: "bg-green",
 };
 
-const BLOB_AMP = 40; // px – Blob bleibt bei 38rem/34rem Größe klar unter 50% Bleed
-const DOT_AMP = 15; // px – Punkte bleiben auch bei schmalen Viewports voll sichtbar
-
 // Die zwei großen Kreise (Koralle oben rechts, Hellblau unten links, beide
 // bleeding über den Rand) und die drei kleinen Akzent-Punkte – exakt fünf
 // Elemente, fix im DOM verankert. Es werden nie mehr erzeugt.
@@ -59,7 +60,12 @@ const SHAPES: ShapeConfig[] = [
       width: "min(38rem, 92vw)",
       height: "min(38rem, 92vw)",
     },
-    amp: BLOB_AMP,
+    xOffset: { unit: "rem", value: 14 },
+    xDir: "right",
+    yOffset: { unit: "rem", value: 14 },
+    yDir: "top",
+    sizeRem: 38,
+    sizeVwFrac: 0.92,
     freqX: 0.0012,
     freqY: 0.0009,
     freqX2: 0.0021,
@@ -76,7 +82,12 @@ const SHAPES: ShapeConfig[] = [
       width: "min(34rem, 88vw)",
       height: "min(34rem, 88vw)",
     },
-    amp: BLOB_AMP,
+    xOffset: { unit: "rem", value: 13 },
+    xDir: "left",
+    yOffset: { unit: "rem", value: 13 },
+    yDir: "bottom",
+    sizeRem: 34,
+    sizeVwFrac: 0.88,
     freqX: 0.0008,
     freqY: 0.0013,
     freqX2: 0.0017,
@@ -93,7 +104,10 @@ const SHAPES: ShapeConfig[] = [
       width: "0.9rem",
       height: "0.9rem",
     },
-    amp: DOT_AMP,
+    xOffset: { unit: "vw", value: 18 },
+    xDir: "right",
+    yOffset: { unit: "rem", value: 7 },
+    yDir: "top",
     freqX: 0.002,
     freqY: 0.0016,
     freqX2: 0.0032,
@@ -110,7 +124,10 @@ const SHAPES: ShapeConfig[] = [
       width: "0.7rem",
       height: "0.7rem",
     },
-    amp: DOT_AMP,
+    xOffset: { unit: "rem", value: 7 },
+    xDir: "right",
+    yOffset: { unit: "rem", value: 13 },
+    yDir: "top",
     freqX: 0.0017,
     freqY: 0.0021,
     freqX2: 0.0029,
@@ -127,7 +144,10 @@ const SHAPES: ShapeConfig[] = [
       width: "1rem",
       height: "1rem",
     },
-    amp: DOT_AMP,
+    xOffset: { unit: "vw", value: 16 },
+    xDir: "left",
+    yOffset: { unit: "rem", value: 9 },
+    yDir: "bottom",
     freqX: 0.0022,
     freqY: 0.0011,
     freqX2: 0.0034,
@@ -136,25 +156,80 @@ const SHAPES: ShapeConfig[] = [
   },
 ];
 
+function toPx(spec: OffsetSpec, viewportWidth: number): number {
+  return spec.unit === "rem" ? spec.value * 16 : (spec.value / 100) * viewportWidth;
+}
+
+function useViewportWidth() {
+  const [width, setWidth] = useState(1280);
+
+  useEffect(() => {
+    function update() {
+      setWidth(window.innerWidth);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return width;
+}
+
 // Zwei überlagerte Sinuswellen mit Gewichten, die sich zu 1 summieren – das
-// Ergebnis bleibt dadurch immer exakt innerhalb von [-amp, +amp], egal wie
-// die Wellen sich überlagern. So ist die Bewegungsgrenze mathematisch
-// garantiert und nicht nur "meistens" eingehalten.
+// Ergebnis bleibt dadurch immer exakt innerhalb von [min, max], egal wie
+// sich die Wellen überlagern.
 function useScrollAxis(
   scrollY: MotionValue<number>,
-  amp: number,
+  min: number,
+  max: number,
   freqA: number,
   freqB: number,
-  phase: number,
-  scale: number
+  phase: number
 ) {
-  const boundedAmp = amp * scale;
+  const center = (min + max) / 2;
+  const half = (max - min) / 2;
+
   return useTransform(scrollY, (value) => {
     const wave =
       Math.sin(value * freqA + phase) * 0.65 +
       Math.sin(value * freqB + phase * 1.8) * 0.35;
-    return wave * boundedAmp;
+    return center + wave * half;
   });
+}
+
+// Bewegungsgrenzen je Achse: "outward" = weiter aus dem Bildschirm heraus,
+// "inward" = weiter hinein Richtung Bildschirmmitte.
+function useAxisRange(
+  shape: ShapeConfig,
+  dir: "left" | "right" | "top" | "bottom",
+  offset: OffsetSpec,
+  viewportWidth: number,
+  scale: number
+): [number, number] {
+  const offsetPx = toPx(offset, viewportWidth);
+
+  if (shape.kind === "blob") {
+    const sizePx = Math.min(
+      (shape.sizeRem ?? 0) * 16,
+      (shape.sizeVwFrac ?? 1) * viewportWidth
+    );
+    // Maximal 50% des Kreises darf aus dem Bildschirm ragen.
+    const outward = Math.max(0, 0.5 * sizePx - offsetPx) * scale;
+    // Heuristischer Puffer gegen Überlappung der beiden großen Kreise:
+    // sie dürfen sich deutlich bewegen, aber nicht zu weit Richtung Mitte.
+    const inward = 0.35 * sizePx * scale;
+
+    if (dir === "right") return [-inward, outward]; // + = weiter nach rechts raus
+    if (dir === "left") return [-outward, inward]; // - = weiter nach links raus
+    if (dir === "top") return [-outward, inward]; // - = weiter nach oben raus
+    return [-inward, outward]; // bottom: + = weiter nach unten raus
+  }
+
+  // Punkte: dürfen nie ganz verschwinden – Bewegung bleibt innerhalb von
+  // 85% des Abstands zur jeweils nächsten Kante, symmetrisch in beide
+  // Richtungen (die gegenüberliegende Kante ist immer deutlich weiter weg).
+  const budget = offsetPx * 0.85 * scale;
+  return [-budget, budget];
 }
 
 function MovingShape({
@@ -162,28 +237,30 @@ function MovingShape({
   scrollY,
   reducedMotion,
   scale,
+  viewportWidth,
 }: {
   shape: ShapeConfig;
   scrollY: MotionValue<number>;
   reducedMotion: boolean;
   scale: number;
+  viewportWidth: number;
 }) {
-  const x = useScrollAxis(
-    scrollY,
-    shape.amp,
-    shape.freqX,
-    shape.freqX2,
-    shape.phase,
+  const [xMin, xMax] = useAxisRange(
+    shape,
+    shape.xDir,
+    shape.xOffset,
+    viewportWidth,
     scale
   );
-  const y = useScrollAxis(
-    scrollY,
-    shape.amp,
-    shape.freqY,
-    shape.freqY2,
-    shape.phase,
+  const [yMin, yMax] = useAxisRange(
+    shape,
+    shape.yDir,
+    shape.yOffset,
+    viewportWidth,
     scale
   );
+  const x = useScrollAxis(scrollY, xMin, xMax, shape.freqX, shape.freqX2, shape.phase);
+  const y = useScrollAxis(scrollY, yMin, yMax, shape.freqY, shape.freqY2, shape.phase);
   const colorClass =
     shape.kind === "blob" ? BLOB_COLOR[shape.color] : DOT_COLOR[shape.color];
 
@@ -209,6 +286,7 @@ function MovingShape({
 export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
   const shouldReduceMotion = useReducedMotion();
   const { scrollY } = useScroll();
+  const viewportWidth = useViewportWidth();
   const scale = subtle ? 0.55 : 1;
 
   return (
@@ -225,6 +303,7 @@ export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
           scrollY={scrollY}
           reducedMotion={Boolean(shouldReduceMotion)}
           scale={scale}
+          viewportWidth={viewportWidth}
         />
       ))}
     </div>
