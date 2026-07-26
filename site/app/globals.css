@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #2b2b2e;
+  background-color: #ffffff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Business@School Karussell: nahtlose Endlos-Schleife, pausiert bei Hover */
+.marquee-track {
+  animation: scroll-left 32s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Presse-Karussell: eigenes Scrollen per Snap-Points */
+.snap-carousel {
+  scrollbar-width: thin;
+}
+
+.snap-carousel::-webkit-scrollbar {
+  height: 6px;
+}
+
+.snap-carousel::-webkit-scrollbar-thumb {
+  background-color: rgba(43, 43, 46, 0.15);
+  border-radius: 9999px;
+}
