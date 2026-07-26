@@ -38,8 +38,7 @@ export default function AgbPage() {
           die handschriftlich (mit Apple Pencil) verfasste Texte auf
           Rechtschreib-, Grammatik- und Zeichensetzungsfehler analysiert und
           die zugrunde liegende Regel erklärt. Die App richtet sich an
-          Schülerinnen und Schüler der Klassen 3 bis 13 im deutschsprachigen
-          Raum (DACH).
+          Nutzer:innen im deutschsprachigen Raum (DACH).
         </p>
       </section>
 

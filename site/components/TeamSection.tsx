@@ -2,11 +2,10 @@ import Image from "next/image";
 import { LinkedInIcon } from "./LinkedInIcon";
 import { ScrollReveal } from "./ScrollReveal";
 
-// TODO: echte LinkedIn-URLs eintragen
 const TEAM_LINKEDIN = {
-  mariam: "#",
-  salvador: "#",
-  blanca: "#",
+  mariam: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
+  salvador: "https://www.linkedin.com/in/salvador-elsen-659673397",
+  blanca: "https://www.linkedin.com/in/blanca-maria-ostrowicz-a443993a7/",
 };
 
 // TODO: echte LinkedIn-Unternehmensseite von FehlerFix eintragen

@@ -22,7 +22,7 @@ export function Hero() {
             Jetzt abonnieren
           </a>
           <p className="text-sm text-ink/50">
-            Fürs iPad · Klasse 3–13 · DACH-Raum
+            Fürs iPad · DACH-Raum
           </p>
         </div>
       </div>

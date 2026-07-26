@@ -20,7 +20,7 @@ const CARDS = [
     border: "border-green/50",
     eyebrow: "Was",
     title: "Was FehlerFix konkret ist",
-    body: "Eine App fürs iPad mit Apple Pencil, für die Klassen 3 bis 13 im gesamten DACH-Raum. FehlerFix läuft als Abo: unbegrenzte Übungen, Handschrifterkennung, Fehleranalyse mit Erklärung und ein persönlicher Fortschrittsverlauf, der zeigt, wie sich die Fehlerquote über die Zeit entwickelt.",
+    body: "Eine App fürs iPad mit Apple Pencil, im gesamten DACH-Raum. FehlerFix läuft als Abo: unbegrenzte Übungen, Handschrifterkennung, Fehleranalyse mit Erklärung und ein persönlicher Fortschrittsverlauf, der zeigt, wie sich die Fehlerquote über die Zeit entwickelt.",
   },
 ];
 

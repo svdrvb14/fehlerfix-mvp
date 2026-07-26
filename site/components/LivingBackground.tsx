@@ -3,11 +3,11 @@
 import {
   motion,
   useReducedMotion,
-  useScroll,
+  useTime,
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 type ShapeColor = "coral" | "blue" | "green";
 
@@ -16,14 +16,17 @@ type ShapeConfig = {
   kind: "blob" | "dot";
   color: ShapeColor;
   style: CSSProperties;
-  // Jede Form hat eigene Amplitude/Frequenz/Phase, damit die Bewegung
-  // organisch wirkt statt wie ein einheitlicher, starrer Parallax-Effekt.
-  ampX: number;
-  ampY: number;
-  freqX: number;
-  freqY: number;
+  // Jede Form wandert mit eigener Amplitude (relativ zur Viewport-Größe)
+  // und zwei überlagerten Perioden pro Achse, damit die Bahn wie ein freies
+  // Wandern über die ganze Fläche wirkt statt wie eine geschlossene
+  // Kreisbahn um die eigene Achse.
+  ampXRatio: number;
+  ampYRatio: number;
+  periodX1: number;
+  periodY1: number;
+  periodX2: number;
+  periodY2: number;
   phase: number;
-  drift: number;
 };
 
 const BLOB_COLOR: Record<ShapeColor, string> = {
@@ -52,12 +55,13 @@ const SHAPES: ShapeConfig[] = [
       width: "min(38rem, 92vw)",
       height: "min(38rem, 92vw)",
     },
-    ampX: 18,
-    ampY: 26,
-    freqX: 0.0012,
-    freqY: 0.0009,
+    ampXRatio: 0.34,
+    ampYRatio: 0.3,
+    periodX1: 26000,
+    periodY1: 32000,
+    periodX2: 41000,
+    periodY2: 37000,
     phase: 0,
-    drift: 10,
   },
   {
     key: "blob-blue",
@@ -69,12 +73,13 @@ const SHAPES: ShapeConfig[] = [
       width: "min(34rem, 88vw)",
       height: "min(34rem, 88vw)",
     },
-    ampX: 22,
-    ampY: 16,
-    freqX: 0.0008,
-    freqY: 0.0013,
+    ampXRatio: 0.3,
+    ampYRatio: 0.34,
+    periodX1: 29000,
+    periodY1: 24000,
+    periodX2: 44000,
+    periodY2: 39000,
     phase: 1.3,
-    drift: 14,
   },
   {
     key: "dot-green",
@@ -86,12 +91,13 @@ const SHAPES: ShapeConfig[] = [
       width: "0.9rem",
       height: "0.9rem",
     },
-    ampX: 14,
-    ampY: 20,
-    freqX: 0.002,
-    freqY: 0.0016,
+    ampXRatio: 0.4,
+    ampYRatio: 0.38,
+    periodX1: 14000,
+    periodY1: 18000,
+    periodX2: 23000,
+    periodY2: 20000,
     phase: 2.1,
-    drift: 6,
   },
   {
     key: "dot-blue",
@@ -103,12 +109,13 @@ const SHAPES: ShapeConfig[] = [
       width: "0.7rem",
       height: "0.7rem",
     },
-    ampX: 20,
-    ampY: 12,
-    freqX: 0.0017,
-    freqY: 0.0021,
+    ampXRatio: 0.42,
+    ampYRatio: 0.36,
+    periodX1: 19000,
+    periodY1: 15500,
+    periodX2: 27000,
+    periodY2: 24000,
     phase: 0.6,
-    drift: 8,
   },
   {
     key: "dot-coral",
@@ -120,47 +127,83 @@ const SHAPES: ShapeConfig[] = [
       width: "1rem",
       height: "1rem",
     },
-    ampX: 16,
-    ampY: 18,
-    freqX: 0.0022,
-    freqY: 0.0011,
+    ampXRatio: 0.38,
+    ampYRatio: 0.4,
+    periodX1: 21000,
+    periodY1: 17000,
+    periodX2: 33000,
+    periodY2: 29000,
     phase: 3.4,
-    drift: 7,
   },
 ];
 
-function useOrganicAxis(
-  scrollY: MotionValue<number>,
-  shape: ShapeConfig,
-  axis: "x" | "y",
+function useViewportSize() {
+  const [size, setSize] = useState({ width: 1280, height: 800 });
+
+  useEffect(() => {
+    function update() {
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  return size;
+}
+
+function useWanderingAxis(
+  time: MotionValue<number>,
+  viewportSize: number,
+  ampRatio: number,
+  periodA: number,
+  periodB: number,
+  phase: number,
   scale: number
 ) {
-  const amp = (axis === "x" ? shape.ampX : shape.ampY) * scale;
-  const freq = axis === "x" ? shape.freqX : shape.freqY;
-  const driftAmp = shape.drift * scale;
-  const driftSign = axis === "x" ? 1 : -1;
+  const amp = ampRatio * viewportSize * scale;
+  const freqA = (2 * Math.PI) / periodA;
+  const freqB = (2 * Math.PI) / periodB;
 
-  return useTransform(scrollY, (value) => {
-    const wave = Math.sin(value * freq + shape.phase) * amp;
-    const drift =
-      Math.sin(value * 0.0006 + shape.phase * 1.7) * driftAmp * driftSign;
-    return wave + drift;
+  return useTransform(time, (t) => {
+    return (
+      Math.sin(t * freqA + phase) * amp * 0.62 +
+      Math.sin(t * freqB + phase * 1.8) * amp * 0.38
+    );
   });
 }
 
 function MovingShape({
   shape,
-  scrollY,
+  time,
+  viewport,
   reducedMotion,
   scale,
 }: {
   shape: ShapeConfig;
-  scrollY: MotionValue<number>;
+  time: MotionValue<number>;
+  viewport: { width: number; height: number };
   reducedMotion: boolean;
   scale: number;
 }) {
-  const x = useOrganicAxis(scrollY, shape, "x", scale);
-  const y = useOrganicAxis(scrollY, shape, "y", scale);
+  const x = useWanderingAxis(
+    time,
+    viewport.width,
+    shape.ampXRatio,
+    shape.periodX1,
+    shape.periodX2,
+    shape.phase,
+    scale
+  );
+  const y = useWanderingAxis(
+    time,
+    viewport.height,
+    shape.ampYRatio,
+    shape.periodY1,
+    shape.periodY2,
+    shape.phase,
+    scale
+  );
   const colorClass =
     shape.kind === "blob" ? BLOB_COLOR[shape.color] : DOT_COLOR[shape.color];
 
@@ -185,7 +228,8 @@ function MovingShape({
 
 export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
   const shouldReduceMotion = useReducedMotion();
-  const { scrollY } = useScroll();
+  const time = useTime();
+  const viewport = useViewportSize();
   const scale = subtle ? 0.55 : 1;
 
   return (
@@ -199,7 +243,8 @@ export function LivingBackground({ subtle = false }: { subtle?: boolean }) {
         <MovingShape
           key={shape.key}
           shape={shape}
-          scrollY={scrollY}
+          time={time}
+          viewport={viewport}
           reducedMotion={Boolean(shouldReduceMotion)}
           scale={scale}
         />
