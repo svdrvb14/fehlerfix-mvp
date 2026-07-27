@@ -1,4 +1,4 @@
-import { ScrollReveal } from "./ScrollReveal";
+import { JourneyCardReveal } from "./JourneyCardReveal";
 
 // Bestimmt sowohl den Versatz der Karten (links/rechts) als auch, an
 // welcher oberen Ecke die JourneyPath-Verbindungslinie samt Stift-Icon
@@ -36,11 +36,10 @@ const CARDS = [
 export function WhyHowWhat() {
   return (
     <section className="relative px-6 py-20 sm:py-28">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-80">
-        {CARDS.map((card, index) => (
-          <ScrollReveal
+      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[28rem]">
+        {CARDS.map((card) => (
+          <JourneyCardReveal
             key={card.id}
-            delay={index * 0.08}
             className={
               CARD_SIDE[card.id] === "left"
                 ? "md:mr-auto md:w-[60%]"
@@ -61,7 +60,7 @@ export function WhyHowWhat() {
                 {card.body}
               </p>
             </div>
-          </ScrollReveal>
+          </JourneyCardReveal>
         ))}
       </div>
     </section>
