@@ -13,7 +13,7 @@ const CARDS = [
     border: "border-blue/40",
     eyebrow: "Wie",
     title: "Wie FehlerFix funktioniert",
-    body: "Handschrift erkennen: FehlerFix liest, was mit dem Apple Pencil aufs iPad geschrieben wird. Fehler analysieren: eine KI erkennt Rechtschreib-, Grammatik- und Zeichensetzungsfehler im Text. Regel erklären: statt nur zu korrigieren, erklärt FehlerFix die Regel dahinter – verständlich und auf das jeweilige Fehlerprofil zugeschnitten.",
+    body: "FehlerFix liest deine Handschrift aus drei von dir geschriebenen Ausgangstexten. Zusätzlich kannst du auch Klassenarbeiten, oder andere von dir geschriebene Texte hochladen. Die App analysiert diese und erstellt ein Fehlerprofil. Basierend auf diesem bekommst du genau auf dich zugeschnittene Übungen, deinen individuellen Lernpfad und eine Vokabelliste mit Wörtern, die du häufig falsch schreibst. Der integrierte KI-Algorithmus passt sich an dich und deine Fähigkeiten an und entwickelt sich mit dir und deinem Fortschritt weiter, so dass du dich bestens weiterentwickeln kannst.",
   },
   {
     id: "was",
