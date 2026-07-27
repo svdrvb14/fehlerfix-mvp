@@ -159,7 +159,10 @@ function SegmentStroke({
   reduced: boolean;
 }) {
   const viewportOffset = typeof window !== "undefined" ? window.innerHeight : 800;
-  const drawStart = seg.p0.y - viewportOffset * 0.75;
+  // Erst kurz nachdem die vorherige Box (die bis eben im Fokus stand) fast
+  // aus dem Bild gescrollt ist, fängt die nächste Linie an zu erscheinen –
+  // nicht schon, während man die vorherige Box noch liest.
+  const drawStart = seg.p0.y - viewportOffset * 0.12;
   const drawEnd = seg.p1.y - viewportOffset * 0.35;
 
   const dashOffset = useTransform(scrollY, [drawStart, drawEnd], [1, 1 - STOP_FRACTION], {
