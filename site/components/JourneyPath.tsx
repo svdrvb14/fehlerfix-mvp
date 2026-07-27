@@ -28,15 +28,19 @@ const MIN_VIEWPORT_WIDTH = 768; // unter md wird gestapelt statt versetzt, keine
 // Jedes Segment zeichnet nur bis 3/4 seiner Kurve – die Linie soll vor der
 // nächsten Textbox aufhören, statt sie zu erreichen/zu überlappen.
 const STOP_FRACTION = 0.75;
-// Der letzte Kontrollpunkt vor der Zielecke wird um diesen Betrag seitlich
-// versetzt (und nur wenig nach oben), damit die Linie flach-diagonal wie
-// "\" (bzw. gespiegelt "/") in die Ecke einläuft statt senkrecht anzukommen.
-const ARRIVAL_DX = 170;
-const ARRIVAL_DY = 60;
+// Anteile von Gesamt-Breite/-Höhe des Segments, an denen die beiden
+// Kontrollpunkte sitzen: der erste hält die Linie kurz nach dem Start noch
+// fast senkrecht, der große seitliche Schwung passiert in der Mitte, und
+// die letzten ~30% der Höhe sind ein steilerer (aber nicht ganz
+// senkrechter) Einlauf in die Zielecke.
+const DEPARTURE_X_FRACTION = 0.03;
+const DEPARTURE_Y_FRACTION = 0.3;
+const ARRIVAL_X_FRACTION = 0.92;
+const ARRIVAL_Y_FRACTION = 0.68;
 // Nach dem Erreichen des Auslöse-Punkts passiert erstmal ~1 Sekunde lang
 // (in Scroll-Distanz) nichts – ein kleines "Einrasten", bevor die nächste
 // Linie überhaupt zu zeichnen beginnt.
-const SNAP_DELAY_PX = 260;
+const SNAP_DELAY_PX = 275;
 
 type Segment = {
   id: string;
@@ -76,14 +80,16 @@ function buildSegments(): Segment[] | null {
     const p1 = topCornerOf(def.toId, side);
     if (!p0 || !p1) return null;
 
+    const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
-    const c1 = { x: p0.x, y: p0.y + dy * 0.55 };
-    // Flache diagonale Ankunft: von rechts-oben für linke Ecken ("\"),
-    // gespiegelt von links-oben für rechte Ecken ("/").
-    const c2 =
-      side === "left"
-        ? { x: p1.x + ARRIVAL_DX, y: p1.y - ARRIVAL_DY }
-        : { x: p1.x - ARRIVAL_DX, y: p1.y - ARRIVAL_DY };
+    const c1 = {
+      x: p0.x + dx * DEPARTURE_X_FRACTION,
+      y: p0.y + dy * DEPARTURE_Y_FRACTION,
+    };
+    const c2 = {
+      x: p0.x + dx * ARRIVAL_X_FRACTION,
+      y: p0.y + dy * ARRIVAL_Y_FRACTION,
+    };
 
     segments.push({ id: def.toId, p0, c1, c2, p1, side: def.side });
   }

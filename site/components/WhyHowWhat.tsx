@@ -43,8 +43,8 @@ export function WhyHowWhat() {
             delay={index * 0.08}
             className={
               CARD_SIDE[card.id] === "left"
-                ? "md:mr-auto md:w-[55%]"
-                : "md:ml-auto md:w-[55%]"
+                ? "md:mr-auto md:w-[60%]"
+                : "md:ml-auto md:w-[60%]"
             }
           >
             <div
