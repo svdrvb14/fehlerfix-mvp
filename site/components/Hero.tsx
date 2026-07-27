@@ -22,7 +22,7 @@ export function Hero() {
           >
             Jetzt abonnieren
           </a>
-          <p className="text-sm text-ink/50">
+          <p id="hero-journey-start" className="text-sm text-ink/50">
             Für jedes Alter, ab der zweiten Klasse
           </p>
         </div>
