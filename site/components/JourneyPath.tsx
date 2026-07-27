@@ -28,6 +28,15 @@ const MIN_VIEWPORT_WIDTH = 768; // unter md wird gestapelt statt versetzt, keine
 // Jedes Segment zeichnet nur bis 3/4 seiner Kurve – die Linie soll vor der
 // nächsten Textbox aufhören, statt sie zu erreichen/zu überlappen.
 const STOP_FRACTION = 0.75;
+// Der letzte Kontrollpunkt vor der Zielecke wird um diesen Betrag seitlich
+// versetzt (und nur wenig nach oben), damit die Linie flach-diagonal wie
+// "\" (bzw. gespiegelt "/") in die Ecke einläuft statt senkrecht anzukommen.
+const ARRIVAL_DX = 170;
+const ARRIVAL_DY = 60;
+// Nach dem Erreichen des Auslöse-Punkts passiert erstmal ~1 Sekunde lang
+// (in Scroll-Distanz) nichts – ein kleines "Einrasten", bevor die nächste
+// Linie überhaupt zu zeichnen beginnt.
+const SNAP_DELAY_PX = 260;
 
 type Segment = {
   id: string;
@@ -63,12 +72,18 @@ function buildSegments(): Segment[] | null {
 
   for (const def of SEGMENT_DEFS) {
     const p0 = bottomCenterOf(def.fromId);
-    const p1 = topCornerOf(def.toId, CARD_SIDE[def.toId] ?? def.side);
+    const side = CARD_SIDE[def.toId] ?? def.side;
+    const p1 = topCornerOf(def.toId, side);
     if (!p0 || !p1) return null;
 
     const dy = p1.y - p0.y;
     const c1 = { x: p0.x, y: p0.y + dy * 0.55 };
-    const c2 = { x: p1.x, y: p0.y + dy * 0.45 };
+    // Flache diagonale Ankunft: von rechts-oben für linke Ecken ("\"),
+    // gespiegelt von links-oben für rechte Ecken ("/").
+    const c2 =
+      side === "left"
+        ? { x: p1.x + ARRIVAL_DX, y: p1.y - ARRIVAL_DY }
+        : { x: p1.x - ARRIVAL_DX, y: p1.y - ARRIVAL_DY };
 
     segments.push({ id: def.toId, p0, c1, c2, p1, side: def.side });
   }
@@ -159,15 +174,18 @@ function SegmentStroke({
   reduced: boolean;
 }) {
   const viewportOffset = typeof window !== "undefined" ? window.innerHeight : 800;
-  // Erst kurz nachdem die vorherige Box (die bis eben im Fokus stand) fast
-  // aus dem Bild gescrollt ist, fängt die nächste Linie an zu erscheinen –
-  // nicht schon, während man die vorherige Box noch liest.
-  const drawStart = seg.p0.y - viewportOffset * 0.12;
+  const armed = seg.p0.y - viewportOffset * 0.75;
+  // Kleines "Einrasten": zwischen `armed` und `drawStart` bleibt die Linie
+  // unverändert unsichtbar, obwohl schon weitergescrollt wird.
+  const drawStart = armed + SNAP_DELAY_PX;
   const drawEnd = seg.p1.y - viewportOffset * 0.35;
 
-  const dashOffset = useTransform(scrollY, [drawStart, drawEnd], [1, 1 - STOP_FRACTION], {
-    clamp: true,
-  });
+  const dashOffset = useTransform(
+    scrollY,
+    [armed, drawStart, drawEnd],
+    [1, 1, 1 - STOP_FRACTION],
+    { clamp: true }
+  );
 
   return (
     <motion.path
@@ -214,7 +232,9 @@ function SegmentPencil({
         y: "-60%",
       }}
     >
-      <PencilDoodle flip={seg.side === "right"} className="h-14 w-16 sm:h-16 sm:w-20" />
+      {/* Stift bleibt immer in Originalausrichtung wie im Logo, nie
+          gespiegelt. */}
+      <PencilDoodle className="h-14 w-16 sm:h-16 sm:w-20" />
     </motion.div>
   );
 }
