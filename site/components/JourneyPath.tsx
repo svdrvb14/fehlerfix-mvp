@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { CARD_SIDE } from "./WhyHowWhat";
 import { PencilDoodle } from "./PencilDoodle";
-import { centerLockY, pencilTriggerY } from "./journeyTiming";
+import { centerLockY, PENCIL_FADE_PX, pencilTriggerY } from "./journeyTiming";
 import { useJourneyScrollLock } from "./useJourneyScrollLock";
 
 type Point = { x: number; y: number };
@@ -236,8 +236,12 @@ function SegmentPencil({
   const triggerY = pencilTriggerY(seg.p1.y, seg.p1Height, viewportHeight);
   const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
 
-  const opacity = useTransform(scrollY, [triggerY - 60, triggerY], [0, 1], { clamp: true });
-  const scale = useTransform(scrollY, [triggerY - 60, triggerY], [0.6, 1], { clamp: true });
+  const opacity = useTransform(scrollY, [triggerY - PENCIL_FADE_PX, triggerY], [0, 1], {
+    clamp: true,
+  });
+  const scale = useTransform(scrollY, [triggerY - PENCIL_FADE_PX, triggerY], [0.6, 1], {
+    clamp: true,
+  });
 
   return (
     <motion.div
