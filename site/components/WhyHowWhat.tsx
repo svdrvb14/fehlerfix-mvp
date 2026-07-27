@@ -36,7 +36,7 @@ const CARDS = [
 export function WhyHowWhat() {
   return (
     <section className="relative px-6 py-20 sm:py-28">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-24">
+      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-40">
         {CARDS.map((card, index) => (
           <ScrollReveal
             key={card.id}
