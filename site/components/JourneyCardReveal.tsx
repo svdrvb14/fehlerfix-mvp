@@ -7,14 +7,24 @@ import { boxRevealEnd, boxRevealStart } from "./journeyTiming";
 export function JourneyCardReveal({
   children,
   className,
+  id,
 }: {
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   const shouldReduceMotion = useReducedMotion();
+  // Die Positionsmessung (für JourneyPath-Linie, Stift und Scroll-Lock, die
+  // alle per document.getElementById(id) auf diesen äußeren Wrapper
+  // zugreifen) sitzt bewusst auf einem Element OHNE Transform. Würde die
+  // Ein-/Ausblend-Animation (Opacity + y) direkt auf das Element mit der id
+  // liegen, würde jede Messung während der Animation die noch nicht
+  // abgeschlossene Verschiebung mit einrechnen und die Karte am Ende leicht
+  // versetzt zur Bildschirmmitte einrasten lassen.
   const ref = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   const [cardTopY, setCardTopY] = useState<number | null>(null);
+  const [cardHeight, setCardHeight] = useState(0);
 
   useEffect(() => {
     function measure() {
@@ -22,6 +32,7 @@ export function JourneyCardReveal({
       if (!el) return;
       const rect = el.getBoundingClientRect();
       setCardTopY(rect.top + window.scrollY);
+      setCardHeight(rect.height);
     }
 
     measure();
@@ -36,27 +47,25 @@ export function JourneyCardReveal({
   }, []);
 
   const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
-  const boxStart = boxRevealStart(cardTopY ?? 0, viewportHeight);
-  const boxEnd = boxRevealEnd(cardTopY ?? 0, viewportHeight);
+  const boxStart = boxRevealStart(cardTopY ?? 0, cardHeight, viewportHeight);
+  const boxEnd = boxRevealEnd(cardTopY ?? 0, cardHeight, viewportHeight);
 
   const opacity = useTransform(scrollY, [boxStart, boxEnd], [0, 1], { clamp: true });
   const y = useTransform(scrollY, [boxStart, boxEnd], [28, 0], { clamp: true });
 
   if (shouldReduceMotion) {
     return (
-      <div ref={ref} className={className}>
+      <div ref={ref} id={id} className={className}>
         {children}
       </div>
     );
   }
 
   return (
-    <motion.div
-      ref={ref}
-      className={className}
-      style={cardTopY === null ? { opacity: 0 } : { opacity, y }}
-    >
-      {children}
-    </motion.div>
+    <div ref={ref} id={id} className={className}>
+      <motion.div style={cardTopY === null ? { opacity: 0 } : { opacity, y }}>
+        {children}
+      </motion.div>
+    </div>
   );
 }

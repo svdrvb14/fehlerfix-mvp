@@ -10,7 +10,8 @@ import {
 import { useEffect, useState } from "react";
 import { CARD_SIDE } from "./WhyHowWhat";
 import { PencilDoodle } from "./PencilDoodle";
-import { nextLineDrawStart, pencilTriggerY } from "./journeyTiming";
+import { centerLockY, pencilTriggerY } from "./journeyTiming";
+import { useJourneyScrollLock } from "./useJourneyScrollLock";
 
 type Point = { x: number; y: number };
 type Side = "left" | "right";
@@ -24,6 +25,8 @@ const SEGMENT_DEFS: SegmentDef[] = [
   { fromId: "warum", toId: "wie", side: "right" },
   { fromId: "wie", toId: "was", side: "left" },
 ];
+
+const CARD_IDS = ["warum", "wie", "was"] as const;
 
 const MIN_VIEWPORT_WIDTH = 768; // unter md wird gestapelt statt versetzt, keine Linie
 // Jedes Segment zeichnet nur bis 3/4 seiner Kurve – die Linie soll vor der
@@ -45,6 +48,7 @@ type Segment = {
   c1: Point;
   c2: Point;
   p1: Point;
+  p1Height: number;
   side: Side;
 };
 
@@ -56,13 +60,13 @@ function bottomCenterOf(id: string): Point | null {
   return { x: rect.left + rect.width / 2, y: rect.bottom + scrollY };
 }
 
-function topCornerOf(id: string, side: Side): Point | null {
+function topCornerOf(id: string, side: Side): (Point & { height: number }) | null {
   const el = document.getElementById(id);
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   const scrollY = window.scrollY;
   const x = side === "left" ? rect.left : rect.right;
-  return { x, y: rect.top + scrollY };
+  return { x, y: rect.top + scrollY, height: rect.height };
 }
 
 // Jedes Segment beginnt an der UNTERKANTE der vorherigen Karte (bzw. am
@@ -74,8 +78,9 @@ function buildSegments(): Segment[] | null {
   for (const def of SEGMENT_DEFS) {
     const p0 = bottomCenterOf(def.fromId);
     const side = CARD_SIDE[def.toId] ?? def.side;
-    const p1 = topCornerOf(def.toId, side);
-    if (!p0 || !p1) return null;
+    const target = topCornerOf(def.toId, side);
+    if (!p0 || !target) return null;
+    const { height, ...p1 } = target;
 
     const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
@@ -88,7 +93,7 @@ function buildSegments(): Segment[] | null {
       y: p0.y + dy * ARRIVAL_Y_FRACTION,
     };
 
-    segments.push({ id: def.toId, p0, c1, c2, p1, side: def.side });
+    segments.push({ id: def.toId, p0, c1, c2, p1, p1Height: height, side: def.side });
   }
   return segments;
 }
@@ -114,6 +119,8 @@ export function JourneyPath() {
   const [segments, setSegments] = useState<Segment[] | null>(null);
   const [docHeight, setDocHeight] = useState(0);
   const { scrollY } = useScroll();
+
+  useJourneyScrollLock(CARD_IDS, !shouldReduceMotion);
 
   useEffect(() => {
     function measure() {
@@ -150,11 +157,12 @@ export function JourneyPath() {
         {segments.map((seg, index) => {
           // Das allererste Segment (vom Hero-Text) soll sofort beim
           // Losscrollen zeichnen, ganz ohne Anlauf-Pause. Jedes weitere
-          // Segment darf erst starten, nachdem die vorherige Box fertig
-          // eingeblendet UND kurz eingerastet ist.
+          // Segment darf erst starten, sobald der Bildschirm bei der
+          // vorherigen Karte eingerastet war (und man weiterscrollt).
+          const prev = segments[index - 1];
           const drawStart =
-            index === 0 ? 0 : nextLineDrawStart(segments[index - 1].p1.y, viewportHeight);
-          const drawEnd = pencilTriggerY(seg.p1.y, viewportHeight);
+            index === 0 ? 0 : centerLockY(prev.p1.y, prev.p1Height, viewportHeight);
+          const drawEnd = pencilTriggerY(seg.p1.y, seg.p1Height, viewportHeight);
 
           return (
             <SegmentStroke
@@ -225,7 +233,7 @@ function SegmentPencil({
   viewportHeight: number;
   reduced: boolean;
 }) {
-  const triggerY = pencilTriggerY(seg.p1.y, viewportHeight);
+  const triggerY = pencilTriggerY(seg.p1.y, seg.p1Height, viewportHeight);
   const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
 
   const opacity = useTransform(scrollY, [triggerY - 60, triggerY], [0, 1], { clamp: true });

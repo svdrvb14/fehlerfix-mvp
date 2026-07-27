@@ -35,20 +35,20 @@ const CARDS = [
 
 export function WhyHowWhat() {
   return (
-    <section className="relative px-6 pt-20 pb-20 sm:pt-28 sm:pb-28 md:pb-[62rem]">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[28rem]">
+    <section className="relative px-6 pt-20 pb-20 sm:pt-28 sm:pb-28 md:pb-[40rem]">
+      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[34rem]">
         {CARDS.map((card) => (
           <JourneyCardReveal
             key={card.id}
+            id={card.id}
             className={
               CARD_SIDE[card.id] === "left"
-                ? "md:mr-auto md:w-[60%]"
-                : "md:ml-auto md:w-[60%]"
+                ? "scroll-mt-24 md:mr-auto md:w-[70%]"
+                : "scroll-mt-24 md:ml-auto md:w-[70%]"
             }
           >
             <div
-              id={card.id}
-              className={`scroll-mt-24 rounded-3xl border-2 bg-white/90 p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:p-10 ${card.border}`}
+              className={`rounded-3xl border-2 bg-white/90 p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:p-10 ${card.border}`}
             >
               <p className="font-poppins text-sm font-bold uppercase tracking-wide text-ink/40">
                 {card.eyebrow}
