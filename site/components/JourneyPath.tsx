@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from "react";
 import { CARD_SIDE } from "./WhyHowWhat";
 import { PencilDoodle } from "./PencilDoodle";
+import { nextLineDrawStart, pencilTriggerY } from "./journeyTiming";
 
 type Point = { x: number; y: number };
 type Side = "left" | "right";
@@ -37,10 +38,6 @@ const DEPARTURE_X_FRACTION = 0.03;
 const DEPARTURE_Y_FRACTION = 0.3;
 const ARRIVAL_X_FRACTION = 0.92;
 const ARRIVAL_Y_FRACTION = 0.68;
-// Nach dem Erreichen des Auslöse-Punkts passiert erstmal ~1 Sekunde lang
-// (in Scroll-Distanz) nichts – ein kleines "Einrasten", bevor die nächste
-// Linie überhaupt zu zeichnen beginnt.
-const SNAP_DELAY_PX = 275;
 
 type Segment = {
   id: string;
@@ -141,6 +138,8 @@ export function JourneyPath() {
 
   if (!segments) return null;
 
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
+
   return (
     <div
       aria-hidden
@@ -148,14 +147,26 @@ export function JourneyPath() {
       style={{ height: docHeight }}
     >
       <svg className="h-full w-full overflow-visible" style={{ position: "absolute", inset: 0 }}>
-        {segments.map((seg) => (
-          <SegmentStroke
-            key={seg.id}
-            seg={seg}
-            scrollY={scrollY}
-            reduced={Boolean(shouldReduceMotion)}
-          />
-        ))}
+        {segments.map((seg, index) => {
+          // Das allererste Segment (vom Hero-Text) soll sofort beim
+          // Losscrollen zeichnen, ganz ohne Anlauf-Pause. Jedes weitere
+          // Segment darf erst starten, nachdem die vorherige Box fertig
+          // eingeblendet UND kurz eingerastet ist.
+          const drawStart =
+            index === 0 ? 0 : nextLineDrawStart(segments[index - 1].p1.y, viewportHeight);
+          const drawEnd = pencilTriggerY(seg.p1.y, viewportHeight);
+
+          return (
+            <SegmentStroke
+              key={seg.id}
+              seg={seg}
+              scrollY={scrollY}
+              drawStart={drawStart}
+              drawEnd={drawEnd}
+              reduced={Boolean(shouldReduceMotion)}
+            />
+          );
+        })}
       </svg>
 
       {segments.map((seg) => (
@@ -163,6 +174,7 @@ export function JourneyPath() {
           key={seg.id}
           seg={seg}
           scrollY={scrollY}
+          viewportHeight={viewportHeight}
           reduced={Boolean(shouldReduceMotion)}
         />
       ))}
@@ -173,25 +185,19 @@ export function JourneyPath() {
 function SegmentStroke({
   seg,
   scrollY,
+  drawStart,
+  drawEnd,
   reduced,
 }: {
   seg: Segment;
   scrollY: MotionValue<number>;
+  drawStart: number;
+  drawEnd: number;
   reduced: boolean;
 }) {
-  const viewportOffset = typeof window !== "undefined" ? window.innerHeight : 800;
-  const armed = seg.p0.y - viewportOffset * 0.75;
-  // Kleines "Einrasten": zwischen `armed` und `drawStart` bleibt die Linie
-  // unverändert unsichtbar, obwohl schon weitergescrollt wird.
-  const drawStart = armed + SNAP_DELAY_PX;
-  const drawEnd = seg.p1.y - viewportOffset * 0.35;
-
-  const dashOffset = useTransform(
-    scrollY,
-    [armed, drawStart, drawEnd],
-    [1, 1, 1 - STOP_FRACTION],
-    { clamp: true }
-  );
+  const dashOffset = useTransform(scrollY, [drawStart, drawEnd], [1, 1 - STOP_FRACTION], {
+    clamp: true,
+  });
 
   return (
     <motion.path
@@ -211,16 +217,15 @@ function SegmentStroke({
 function SegmentPencil({
   seg,
   scrollY,
+  viewportHeight,
   reduced,
 }: {
   seg: Segment;
   scrollY: MotionValue<number>;
+  viewportHeight: number;
   reduced: boolean;
 }) {
-  const viewportOffset = typeof window !== "undefined" ? window.innerHeight : 800;
-  // Gleicher Schwellenwert wie das Ende der 75%-Zeichnung in SegmentStroke,
-  // damit der Stift exakt dort erscheint, wo die Linie stoppt.
-  const triggerY = seg.p1.y - viewportOffset * 0.35;
+  const triggerY = pencilTriggerY(seg.p1.y, viewportHeight);
   const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
 
   const opacity = useTransform(scrollY, [triggerY - 60, triggerY], [0, 1], { clamp: true });

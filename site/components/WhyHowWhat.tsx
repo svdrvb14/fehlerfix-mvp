@@ -35,7 +35,7 @@ const CARDS = [
 
 export function WhyHowWhat() {
   return (
-    <section className="relative px-6 py-20 sm:py-28">
+    <section className="relative px-6 pt-20 pb-20 sm:pt-28 sm:pb-28 md:pb-[62rem]">
       <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[28rem]">
         {CARDS.map((card) => (
           <JourneyCardReveal
