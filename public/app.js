@@ -73,27 +73,36 @@ const MODAL_CONTENT = {
   impressum: {
     title: 'Impressum',
     html: `
-      <p>Angaben gemäß § 5 TMG / DSG-VO</p>
+      <p>Angaben gemäß § 5 TMG</p>
 
       <h3>Anbieter</h3>
       <p>
-        Business@School Team Leibnizschule<br>
-        – Schülerprojekt FehlerFix –<br>
-        Kontakt: contact.temfehlerfix@gmail.com
+        FehlerFix GmbH (in Gründung)<br>
+        Wiesbaden, Deutschland
       </p>
 
-      <h3>Hinweis</h3>
-      <p>Diese Anwendung ist ein nicht-kommerzielles Schulprojekt (MVP). Sie wird ausschließlich zu Lern- und Demonstrationszwecken im Rahmen eines Wettbewerbs betrieben.</p>
+      <h3>Vertreten durch</h3>
+      <p>Salvador Elsen, Mariam Barry, Blanca Ostrowicz</p>
 
-      <h3>Datenverarbeitung</h3>
-      <p>Während der Nutzung werden handgeschriebene Texte an die Anthropic API (Claude) übertragen, um sie auszuwerten. Es findet keine dauerhafte Speicherung der Texte oder Bilder statt – Sessions werden nur im Arbeitsspeicher des Servers gehalten und beim Neustart gelöscht.</p>
+      <h3>Kontakt</h3>
+      <p>E-Mail: contact.us@fehlerfix.com</p>
 
-      <h3>Haftungsausschluss</h3>
+      <h3>Handelsregister</h3>
+      <p>Eintragung im Handelsregister ist derzeit noch nicht erfolgt. Diese Angaben werden nach erfolgter Eintragung ergänzt.</p>
+
+      <h3>Umsatzsteuer-ID</h3>
+      <p>USt-IdNr. wird ergänzt.</p>
+
+      <h3>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h3>
+      <p>Salvador Elsen<br>salvador.elsen@fehlerfix.com</p>
+
+      <h3>Streitschlichtung</h3>
+      <p>Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:
+        <a href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noopener">https://ec.europa.eu/consumers/odr/</a>.
+        Wir sind nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+
+      <h3>Hinweis zur App</h3>
       <p>Die Inhalte und Bewertungen werden durch eine KI generiert und können fehlerhaft sein. Es besteht kein Anspruch auf Korrektheit der Korrekturen oder Erklärungen.</p>
-
-      <div class="impressum-block">
-        Bei einem späteren produktiven Einsatz werden die Pflichtangaben (vollständige Anschrift, V.i.S.d.P., Datenschutzerklärung) entsprechend ergänzt.
-      </div>
     `,
   },
 };
