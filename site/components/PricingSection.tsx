@@ -58,7 +58,7 @@ export function PricingSection() {
   return (
     <section id="preise" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
       <ScrollReveal className="mx-auto max-w-lg text-center">
-        <h2 className="text-balance font-poppins text-3xl font-bold text-ink sm:text-4xl">
+        <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
           Preise
         </h2>
         <p className="mt-3 text-lg text-ink/70">
@@ -69,7 +69,7 @@ export function PricingSection() {
           <button
             type="button"
             onClick={() => setPlan("monthly")}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition duration-150 active:scale-95 ${
               plan === "monthly" ? "bg-ink text-white" : "text-ink/60"
             }`}
           >
@@ -78,7 +78,7 @@ export function PricingSection() {
           <button
             type="button"
             onClick={() => setPlan("yearly")}
-            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+            className={`rounded-full px-5 py-2 text-sm font-semibold transition duration-150 active:scale-95 ${
               plan === "yearly" ? "bg-ink text-white" : "text-ink/60"
             }`}
           >
@@ -110,7 +110,7 @@ export function PricingSection() {
             type="button"
             onClick={handleSubscribe}
             disabled={loading}
-            className="mt-8 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition hover:bg-coral/90 disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-8 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
           >
             {loading ? "Wird geladen…" : "Jetzt abonnieren"}
           </button>

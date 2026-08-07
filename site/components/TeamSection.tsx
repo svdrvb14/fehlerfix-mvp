@@ -2,11 +2,10 @@ import Image from "next/image";
 import { LinkedInIcon } from "./LinkedInIcon";
 import { ScrollReveal } from "./ScrollReveal";
 
-// TODO: echte LinkedIn-URLs eintragen
 const TEAM_LINKEDIN = {
-  mariam: "#",
-  salvador: "#",
-  blanca: "#",
+  mariam: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
+  salvador: "https://www.linkedin.com/in/salvador-elsen-659673397",
+  blanca: "https://www.linkedin.com/in/blanca-maria-ostrowicz-a443993a7/",
 };
 
 // TODO: echte LinkedIn-Unternehmensseite von FehlerFix eintragen
@@ -14,11 +13,6 @@ const TEAM_LINKEDIN = {
 export const FEHLERFIX_LINKEDIN_URL = "#";
 
 const team = [
-  {
-    name: "Mariam Barry",
-    role: "CEO & CAO",
-    linkedin: TEAM_LINKEDIN.mariam,
-  },
   {
     name: "Salvador Elsen",
     role: "CFO & CTO",
@@ -29,6 +23,11 @@ const team = [
     role: "COO & CMO",
     linkedin: TEAM_LINKEDIN.blanca,
   },
+  {
+    name: "Mariam Barry",
+    role: "CEO & CAO",
+    linkedin: TEAM_LINKEDIN.mariam,
+  },
 ];
 
 export function TeamSection() {
@@ -36,7 +35,7 @@ export function TeamSection() {
     <section id="team" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
       <div className="mx-auto max-w-4xl text-center">
         <ScrollReveal>
-          <h2 className="text-balance font-poppins text-3xl font-bold text-ink sm:text-4xl">
+          <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
             Das Team hinter FehlerFix
           </h2>
         </ScrollReveal>
