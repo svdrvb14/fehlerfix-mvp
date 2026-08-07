@@ -25,6 +25,29 @@ body {
   }
 }
 
+/* Transluzente Flächen werden solide, wenn das System weniger Transparenz
+   wünscht - der Blur entfällt, die Fläche bleibt als Ebene erhalten. */
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    background-color: #ffffff !important;
+  }
+}
+
+/* Bei erhöhtem Kontrastwunsch bekommen halbtransparente Karten einen
+   soliden Grund und klar definierte Kanten. */
+@media (prefers-contrast: more) {
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-xl {
+    backdrop-filter: none !important;
+    background-color: #ffffff !important;
+    border-color: rgba(43, 43, 46, 0.6) !important;
+  }
+}
+
 .text-balance {
   text-wrap: balance;
 }

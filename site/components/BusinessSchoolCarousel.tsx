@@ -13,7 +13,7 @@ export function BusinessSchoolCarousel() {
   return (
     <section className="relative overflow-hidden py-16 sm:py-20">
       <ScrollReveal className="px-6 text-center">
-        <h2 className="text-balance font-poppins text-3xl font-bold text-ink sm:text-4xl">
+        <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
           Business@School
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-lg text-ink/70">

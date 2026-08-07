@@ -24,7 +24,9 @@ export function ScrollReveal({
       initial={{ opacity: 0, y: 32, scale: 0.98 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: false, margin: "-80px" }}
-      transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1], delay }}
+      // Kritisch gedämpfte Feder statt fester Kurve: kein Überschwingen,
+      // da der Einblendung keine Nutzer-Geste mit Schwung vorausgeht.
+      transition={{ type: "spring", bounce: 0, duration: 0.6, delay }}
     >
       {children}
     </motion.div>

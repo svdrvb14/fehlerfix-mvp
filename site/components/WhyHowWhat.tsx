@@ -53,7 +53,7 @@ export function WhyHowWhat() {
               <p className="font-poppins text-sm font-bold uppercase tracking-wide text-ink/40">
                 {card.eyebrow}
               </p>
-              <h2 className="mt-2 text-balance font-poppins text-2xl font-bold text-ink sm:text-3xl">
+              <h2 className="mt-2 text-balance font-poppins text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                 {card.title}
               </h2>
               <p className="mt-4 text-lg leading-relaxed text-ink/70">

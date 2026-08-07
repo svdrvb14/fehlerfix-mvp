@@ -88,7 +88,7 @@ export function PressCarousel() {
   return (
     <section id="presse" className="relative scroll-mt-24 py-16 sm:py-20">
       <ScrollReveal className="px-6 text-center">
-        <h2 className="text-balance font-poppins text-3xl font-bold text-ink sm:text-4xl">
+        <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
           Presse &amp; Stimmen
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-lg text-ink/70">

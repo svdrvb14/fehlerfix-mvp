@@ -35,7 +35,7 @@ export function TeamSection() {
     <section id="team" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
       <div className="mx-auto max-w-4xl text-center">
         <ScrollReveal>
-          <h2 className="text-balance font-poppins text-3xl font-bold text-ink sm:text-4xl">
+          <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
             Das Team hinter FehlerFix
           </h2>
         </ScrollReveal>
