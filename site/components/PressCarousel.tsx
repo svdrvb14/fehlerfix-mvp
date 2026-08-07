@@ -3,32 +3,26 @@
 import { useEffect, useRef } from "react";
 import { ScrollReveal } from "./ScrollReveal";
 
-// TODO: echte Presse-Zitate/Kommentare eintragen, sobald verfügbar.
 const PRESS_ITEMS = [
   {
     quote:
-      "„Eine App, die Rechtschreibfehler nicht nur markiert, sondern erklärt – genau das hat im Unterricht gefehlt.“",
-    source: "Platzhalter-Quelle 1",
+      "„Es ist eine exzellente Idee, dass die anvisierte App nicht nur Fehler markiert, sondern diese auch verständlich erklärt.“",
+    source: "Sprachwissenschaftler",
   },
   {
     quote:
-      "„FehlerFix zeigt, wie KI im Klassenzimmer sinnvoll eingesetzt werden kann, statt Abkürzungen zu ermöglichen.“",
-    source: "Platzhalter-Quelle 2",
+      "„FehlerFix hat das Potenzial, bestehende erfolgreiche Modelle wie GoStudent, Studienkreis etc. abzulösen – daher kann das ein spannendes Investment für einen Venture Capital Fund sein!“",
+    source: "VC-Investor, TX Ventures AG, Zürich",
   },
   {
     quote:
-      "„Der Sieg bei Business@School war verdient – ein Produkt mit echtem pädagogischen Mehrwert.“",
-    source: "Platzhalter-Quelle 3",
+      "„Ich würde mir die App runterladen, da ich einen Verdacht auf LRS habe. Es würde mein Leben um Einiges erleichtern.“",
+    source: "Schülerin",
   },
   {
     quote:
-      "„Endlich versteht mein Kind, warum ein Wort falsch war – nicht nur, dass es falsch war.“",
-    source: "Platzhalter-Stimme, Elternteil",
-  },
-  {
-    quote:
-      "„Handschrifterkennung mit Apple Pencil und KI-Fehleranalyse in einem – technisch beeindruckend umgesetzt.“",
-    source: "Platzhalter-Quelle 5",
+      "„Mir gefällt, dass mit Hilfe von KI individuellere Förderung möglich gemacht wird, als mit herkömmlichen Lehr-/Lernmitteln!“",
+    source: "Schülerin",
   },
 ];
 
