@@ -28,6 +28,9 @@ export const WHEEL_GESTURE_GAP_MS = 280;
 // Wie weit über einen Lock-Punkt zurückgescrollt werden muss, bevor er beim
 // nächsten Runterscrollen wieder einrastet.
 export const RELOCK_MARGIN_PX = 120;
+// Dauer der weichen Einrast-Animation vom Überschieß-Punkt zurück zur
+// Kartenmitte (ease-out, kaum wahrnehmbar).
+export const SETTLE_ANIM_MS = 260;
 
 // Scroll-Position, bei der die Kartenmitte exakt auf der Bildschirmmitte
 // liegt – das ist zugleich der Punkt, an dem der Bildschirm einrastet.
