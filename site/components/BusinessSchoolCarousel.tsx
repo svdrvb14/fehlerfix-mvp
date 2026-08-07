@@ -1,13 +1,18 @@
 import { ScrollReveal } from "./ScrollReveal";
 
-// Platzhalter-Fotos vom Business@School-Wettbewerb. Die Dateien existieren
-// noch nicht in public/ – echte Fotos folgen und können einfach unter
-// denselben Dateinamen abgelegt werden.
-const PHOTOS = Array.from({ length: 6 }, (_, i) => `/business-school-${i + 1}.jpg`);
+// Echte Fotos vom Deutschlandfinale (Camera Roll), chronologisch sortiert.
+const PHOTO_COUNT = 23;
+const PHOTOS = Array.from({ length: PHOTO_COUNT }, (_, i) => `/business-school-${i + 1}.jpg`);
 
 // Für eine nahtlose Endlos-Schleife wird das Array einmal dupliziert; die
 // CSS-Animation verschiebt genau um -50% der Gesamtbreite.
 const LOOP_PHOTOS = [...PHOTOS, ...PHOTOS];
+
+// Tempo konstant halten, unabhängig von der Fotoanzahl: die Animation legt
+// bei -50% Verschiebung immer die Breite eines einzelnen Fotosatzes zurück,
+// daher skaliert die Dauer linear mit der Fotoanzahl statt fix zu sein.
+const SECONDS_PER_PHOTO = 5.3;
+const MARQUEE_DURATION = `${(PHOTO_COUNT * SECONDS_PER_PHOTO).toFixed(1)}s`;
 
 export function BusinessSchoolCarousel() {
   return (
@@ -22,7 +27,10 @@ export function BusinessSchoolCarousel() {
       </ScrollReveal>
 
       <div className="mt-10 overflow-hidden">
-        <div className="marquee-track flex w-max gap-6">
+        <div
+          className="marquee-track flex w-max gap-6"
+          style={{ animationDuration: MARQUEE_DURATION }}
+        >
           {LOOP_PHOTOS.map((src, index) => (
             <div
               key={`${src}-${index}`}
@@ -31,7 +39,7 @@ export function BusinessSchoolCarousel() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
-                alt="Foto vom Business@School-Wettbewerb"
+                alt="Foto vom Business@School-Deutschlandfinale"
                 className="h-full w-full object-cover"
                 loading="lazy"
               />
