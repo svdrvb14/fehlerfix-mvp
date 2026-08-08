@@ -64,8 +64,8 @@ denselben Preis mit `quantity` = 2/3/4 im Checkout; der Rabatt (-11 %/-22 %/
 angewendet werden.
 
 1. Stripe Dashboard → **Product catalog** → Produkt "FehlerFix Abo" anlegen
-2. Vier wiederkehrende Standard-Preise anlegen (12 €/Monat, 89,99 €/Jahr,
-   15 €/Monat, 112,49 €/Jahr - siehe [`.env.local.example`](./.env.local.example))
+2. Vier wiederkehrende Standard-Preise anlegen (11,99 €/Monat, 89,99 €/Jahr,
+   14,99 €/Monat, 112,49 €/Jahr - siehe [`.env.local.example`](./.env.local.example))
    und deren Preis-IDs (`price_...`) in `.env.local` eintragen
 3. Unter **Product catalog → Coupons** drei "Percent off"-Gutscheine
    anlegen (11 %, 22 %, 33 %) - **keine** Promotion Codes dazu erstellen,

@@ -23,8 +23,8 @@ export const FAMILY_DISCOUNT: Record<UserCount, number> = {
 // Basispreis für einen einzelnen Nutzer, in Cent - identisch mit dem
 // unit_amount des jeweiligen Stripe-Preises.
 const BASE_PRICE_CENTS: Record<Language, Record<Billing, number>> = {
-  single: { monthly: 1200, yearly: 8999 },
-  combo: { monthly: 1500, yearly: 11249 },
+  single: { monthly: 1199, yearly: 8999 },
+  combo: { monthly: 1499, yearly: 11249 },
 };
 
 // Gesamtbetrag (Cent) für eine bestimmte Nutzeranzahl: Menge × Basispreis,
