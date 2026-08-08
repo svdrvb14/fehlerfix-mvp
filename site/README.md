@@ -31,17 +31,20 @@ Trage ein:
   verwenden, niemals ins Frontend geben)
 - `STRIPE_SECRET_KEY` – Stripe Dashboard → Developers → API keys
 - `STRIPE_WEBHOOK_SECRET` – siehe Abschnitt 5 (lokales Webhook-Testen)
-- `NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY`, `NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY`
-  – siehe Abschnitt 4
+- `NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_MONTHLY`,
+  `NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_YEARLY`,
+  `NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_MONTHLY`,
+  `NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_YEARLY` – siehe Abschnitt 4
 
-## 3. Supabase-Migration ausführen
+## 3. Supabase-Migrationen ausführen
 
 Die Tabelle `subscriptions` wird **nicht automatisch** angelegt.
 
 1. Supabase-Projekt öffnen → **SQL Editor** → **New query**
 2. Inhalt von [`supabase/migrations/001_subscriptions.sql`](./supabase/migrations/001_subscriptions.sql)
-   komplett hineinkopieren
-3. **Run** klicken
+   komplett hineinkopieren, **Run** klicken
+3. Danach genauso mit [`supabase/migrations/002_subscriptions_quantity.sql`](./supabase/migrations/002_subscriptions_quantity.sql)
+   (fügt die Spalte `quantity` für die gebuchte Nutzeranzahl hinzu)
 
 Das legt die Tabelle `subscriptions` an, aktiviert Row Level Security (jede
 Nutzerin/jeder Nutzer darf nur die eigene Zeile lesen) und richtet einen
@@ -51,11 +54,19 @@ einer E-Mail-Adresse registriert, die bereits in `subscriptions` existiert
 
 ## 4. Stripe-Produkte &amp; Preise verknüpfen
 
+Das Preismodell hat zwei Dimensionen - Sprachumfang (Einzelsprache oder
+Deutsch+Englisch) und Abrechnung (monatlich/jährlich) - macht also vier
+Preise. Das Familienabo (2-4 Nutzer, -11 %/-22 %/-33 %) läuft dabei **nicht**
+über eigene Preise, sondern über eine Stripe-Mengenstaffel (volume tiering)
+auf jedem der vier Preise: die Website schickt die Nutzeranzahl als
+`quantity` mit, Stripe wendet automatisch den passenden Rabatt-Tier an.
+
 1. Stripe Dashboard → **Product catalog** → Produkt "FehlerFix Abo" anlegen
-2. Zwei wiederkehrende Preise anlegen: 7,50 € / Monat und 89,99 € / Jahr
-3. Die jeweiligen Preis-IDs (`price_...`) in `.env.local` unter
-   `NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY` bzw. `NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY`
-   eintragen
+2. Vier wiederkehrende Preise anlegen (je mit "Pricing model" → **Volume**
+   und aktiviertem "Customer chooses quantity", mit 4 Tiers für 1-4 Nutzer)
+   – die exakten Beträge pro Tier stehen in
+   [`.env.local.example`](./.env.local.example)
+3. Die vier Preis-IDs (`price_...`) in `.env.local` eintragen (siehe oben)
 4. Im Stripe Dashboard unter **Settings → Billing → Customer portal** das
    Kundenportal aktivieren (wird von `/api/portal` verwendet)
 
