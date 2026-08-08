@@ -59,12 +59,17 @@ export default function AgbPage() {
           4. Preise &amp; Zahlung
         </h2>
         <p className="mt-3">
-          Es gelten die zum Zeitpunkt der Buchung auf der Website angezeigten
-          Preise{" "}
-          {/* PLATZHALTER: aktuelle Preise, ggf. inkl./exkl. USt. je nach
-              Rechtsform und Kundengruppe, mit Steuerberatung abstimmen */}
-          (aktuell 7,50 € pro Monat bzw. 89,99 € pro Jahr). Die Zahlung
-          erfolgt wiederkehrend (monatlich oder jährlich) über Stripe.
+          Es gelten die zum Zeitpunkt der Buchung auf der{" "}
+          <a href="/#preise" className="text-blue hover:underline">
+            Preise-Seite
+          </a>{" "}
+          angezeigten Preise, gestaffelt nach Sprachumfang (Einzelsprache
+          oder Deutsch und Englisch) und Nutzeranzahl (Einzel- oder
+          Familienabo).{" "}
+          {/* PLATZHALTER: ggf. inkl./exkl. USt. je nach Rechtsform und
+              Kundengruppe, mit Steuerberatung abstimmen */}
+          Die Zahlung erfolgt wiederkehrend (monatlich oder jährlich) über
+          Stripe.
         </p>
       </section>
 

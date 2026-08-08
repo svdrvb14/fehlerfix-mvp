@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 type SubscriptionRow = {
   status: string;
   plan: string | null;
+  quantity: number | null;
   current_period_end: string | null;
 };
 
@@ -23,8 +24,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const PLAN_LABELS: Record<string, string> = {
-  monthly: "Monatlich (7,50 € / Monat)",
-  yearly: "Jährlich (89,99 € / Jahr)",
+  "single-monthly": "Einzelsprache, monatlich",
+  "single-yearly": "Einzelsprache, jährlich",
+  "combo-monthly": "Deutsch + Englisch, monatlich",
+  "combo-yearly": "Deutsch + Englisch, jährlich",
 };
 
 function formatDate(value: string | null) {
@@ -76,7 +79,7 @@ export function KontoClient() {
     let cancelled = false;
     supabase
       .from("subscriptions")
-      .select("status, plan, current_period_end")
+      .select("status, plan, quantity, current_period_end")
       .eq("user_id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -211,6 +214,10 @@ export function KontoClient() {
 
   const statusLabel = subscription ? STATUS_LABELS[subscription.status] ?? subscription.status : null;
   const planLabel = subscription?.plan ? PLAN_LABELS[subscription.plan] ?? subscription.plan : null;
+  const quantityLabel =
+    subscription?.quantity && subscription.quantity > 1
+      ? ` – ${subscription.quantity} Nutzer`
+      : "";
   const hasActiveSubscription =
     subscription && (subscription.status === "active" || subscription.status === "trialing");
 
@@ -236,7 +243,9 @@ export function KontoClient() {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-ink/50">Plan</span>
-              <span className="font-semibold text-ink">{planLabel ?? "–"}</span>
+              <span className="font-semibold text-ink">
+                {planLabel ? `${planLabel}${quantityLabel}` : "–"}
+              </span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-ink/50">Nächste Abrechnung</span>

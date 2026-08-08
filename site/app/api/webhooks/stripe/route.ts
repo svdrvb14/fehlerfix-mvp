@@ -7,8 +7,10 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 function planFromPriceId(priceId?: string | null): string | null {
   if (!priceId) return null;
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY) return "monthly";
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY) return "yearly";
+  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_MONTHLY) return "single-monthly";
+  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_YEARLY) return "single-yearly";
+  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_MONTHLY) return "combo-monthly";
+  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_YEARLY) return "combo-yearly";
   return priceId;
 }
 
@@ -27,6 +29,7 @@ async function upsertSubscription(params: {
   stripeSubscriptionId: string;
   status: string;
   plan: string | null;
+  quantity: number;
   currentPeriodEnd: number;
 }) {
   const { error } = await supabaseAdmin.from("subscriptions").upsert(
@@ -36,6 +39,7 @@ async function upsertSubscription(params: {
       stripe_subscription_id: params.stripeSubscriptionId,
       status: params.status,
       plan: params.plan,
+      quantity: params.quantity,
       current_period_end: new Date(params.currentPeriodEnd * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -85,6 +89,7 @@ export async function POST(request: NextRequest) {
             stripeSubscriptionId: subscription.id,
             status: subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
+            quantity: subscription.items.data[0]?.quantity ?? 1,
             currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }
@@ -109,6 +114,7 @@ export async function POST(request: NextRequest) {
                 ? "canceled"
                 : subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
+            quantity: subscription.items.data[0]?.quantity ?? 1,
             currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }
