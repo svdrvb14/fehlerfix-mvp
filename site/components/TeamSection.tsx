@@ -83,12 +83,6 @@ export function TeamSection() {
             FehlerFix auf LinkedIn
           </a>
         </ScrollReveal>
-
-        <ScrollReveal delay={0.3} className="mt-8 flex justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full bg-green/15 px-5 py-2.5 text-sm font-semibold text-ink">
-            Business@School Sieger 2026
-          </span>
-        </ScrollReveal>
       </div>
     </section>
   );

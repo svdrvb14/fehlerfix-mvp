@@ -40,7 +40,7 @@ export function BusinessSchoolCarousel() {
               <img
                 src={src}
                 alt="Foto vom Business@School-Deutschlandfinale"
-                className="h-full w-full object-cover object-top"
+                className="h-full w-full object-cover"
                 loading="lazy"
               />
             </div>
