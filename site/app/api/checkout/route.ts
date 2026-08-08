@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
   const plan: unknown = body?.plan;
   const language: unknown = body?.language;
   const users: unknown = body?.users;
+  const singleLanguage: unknown = body?.singleLanguage;
 
   if (plan !== "monthly" && plan !== "yearly") {
     return NextResponse.json(
@@ -43,6 +44,16 @@ export async function POST(request: NextRequest) {
   if (language !== "single" && language !== "combo") {
     return NextResponse.json(
       { error: "Ungültige Sprachauswahl. Erwartet: 'single' oder 'combo'." },
+      { status: 400 }
+    );
+  }
+
+  // Beim Einzelabo (nicht beim Deutsch+Englisch-Paket) muss festgelegt sein,
+  // welche der beiden Sprachen der Kunde bekommt - beeinflusst nicht den
+  // Preis, wird aber als Metadaten am Abo hinterlegt.
+  if (language === "single" && singleLanguage !== "de" && singleLanguage !== "en") {
+    return NextResponse.json(
+      { error: "Ungültige Sprachauswahl fürs Einzelabo. Erwartet: 'de' oder 'en'." },
       { status: 400 }
     );
   }
@@ -91,6 +102,14 @@ export async function POST(request: NextRequest) {
       success_url: `${origin}/konto?checkout=success`,
       cancel_url: `${origin}/#preise`,
       customer_email: email,
+      // Sprachwahl beim Einzelabo hat keinen Einfluss auf den Preis, wird
+      // aber am Abo hinterlegt, damit klar ist, welche Sprachversion der
+      // Kunde bekommen soll.
+      subscription_data: {
+        metadata: {
+          single_language: language === "single" ? (singleLanguage as string) : "both",
+        },
+      },
       // Stripe erlaubt "discounts" und "allow_promotion_codes" nicht
       // gleichzeitig auf einer Checkout Session: das Einzelabo lässt den
       // Kunden einen eigenen Aktionscode eingeben, das Familienabo hat den

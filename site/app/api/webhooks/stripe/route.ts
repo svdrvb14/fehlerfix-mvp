@@ -30,6 +30,7 @@ async function upsertSubscription(params: {
   status: string;
   plan: string | null;
   quantity: number;
+  singleLanguage: string | null;
   currentPeriodEnd: number;
 }) {
   const { error } = await supabaseAdmin.from("subscriptions").upsert(
@@ -40,6 +41,7 @@ async function upsertSubscription(params: {
       status: params.status,
       plan: params.plan,
       quantity: params.quantity,
+      single_language: params.singleLanguage,
       current_period_end: new Date(params.currentPeriodEnd * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     },
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
             status: subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
             quantity: subscription.items.data[0]?.quantity ?? 1,
+            singleLanguage: subscription.metadata?.single_language ?? null,
             currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest) {
                 : subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
             quantity: subscription.items.data[0]?.quantity ?? 1,
+            singleLanguage: subscription.metadata?.single_language ?? null,
             currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }

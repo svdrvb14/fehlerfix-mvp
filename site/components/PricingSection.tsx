@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ScrollReveal } from "./ScrollReveal";
 import {
+  FAMILY_DISCOUNT,
   formatEuro,
   perUserPriceCents,
   totalPriceCents,
@@ -12,19 +13,14 @@ import {
   type UserCount,
 } from "@/lib/pricing";
 
+type SingleLanguage = "de" | "en";
+
 const BASE_FEATURES = [
   "Unbegrenzte Übungen",
   "Handschrifterkennung mit Apple Pencil",
   "Fehleranalyse mit Erklärung der Regel",
   "Persönlicher Fortschrittsverlauf",
 ];
-
-const FAMILY_NOTE: Record<UserCount, string | null> = {
-  1: null,
-  2: "Familienabo · 2 Nutzer · −11 %",
-  3: "Familienabo · 3 Nutzer · −22 %",
-  4: "Familienabo · 4 Nutzer · −33 %",
-};
 
 function pillClass(active: boolean) {
   return `rounded-full px-5 py-2 text-sm font-semibold transition duration-150 active:scale-95 ${
@@ -34,6 +30,7 @@ function pillClass(active: boolean) {
 
 export function PricingSection() {
   const [language, setLanguage] = useState<Language>("single");
+  const [singleLanguage, setSingleLanguage] = useState<SingleLanguage>("de");
   const [billing, setBilling] = useState<Billing>("monthly");
   const [users, setUsers] = useState<UserCount>(1);
   const [loading, setLoading] = useState(false);
@@ -47,7 +44,12 @@ export function PricingSection() {
       const response = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: billing, language, users }),
+        body: JSON.stringify({
+          plan: billing,
+          language,
+          users,
+          ...(language === "single" ? { singleLanguage } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -70,13 +72,17 @@ export function PricingSection() {
   const unitLabel = billing === "monthly" ? "/ Monat" : "/ Jahr";
   const perUser = perUserPriceCents(language, billing, users);
   const total = totalPriceCents(language, billing, users);
+  const singleUserPrice = totalPriceCents(language, billing, 1);
   const monthlyEquivalentCents = billing === "yearly" ? Math.round(perUser / 12) : null;
-  const familyNote = FAMILY_NOTE[users];
+  const discountPercent = Math.round(FAMILY_DISCOUNT[users] * 100);
 
   const features =
     language === "combo"
       ? ["Rechtschreibung auf Deutsch und Englisch", ...BASE_FEATURES]
-      : ["Rechtschreibung auf Deutsch", ...BASE_FEATURES];
+      : [
+          `Rechtschreibung auf ${singleLanguage === "de" ? "Deutsch" : "Englisch"}`,
+          ...BASE_FEATURES,
+        ];
 
   return (
     <section id="preise" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
@@ -104,6 +110,25 @@ export function PricingSection() {
             Deutsch + Englisch
           </button>
         </div>
+
+        {language === "single" && (
+          <div className="mx-auto mt-3 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setSingleLanguage("de")}
+              className={pillClass(singleLanguage === "de")}
+            >
+              Deutsch
+            </button>
+            <button
+              type="button"
+              onClick={() => setSingleLanguage("en")}
+              className={pillClass(singleLanguage === "en")}
+            >
+              Englisch
+            </button>
+          </div>
+        )}
 
         <div className="mx-auto mt-3 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
           <button
@@ -140,58 +165,69 @@ export function PricingSection() {
           </div>
         </div>
 
-        <div className="mt-8 rounded-3xl border-2 border-blue/30 bg-white p-8 text-left shadow-[0_10px_40px_rgba(0,0,0,0.06)] sm:p-10">
-          {familyNote && (
-            <p className="mb-3 inline-flex rounded-full bg-green/15 px-3 py-1 text-xs font-semibold text-ink">
-              {familyNote}
-            </p>
-          )}
-
-          <div className="flex items-baseline gap-2">
-            <span className="font-poppins text-4xl font-bold text-ink">
-              {formatEuro(perUser)}
-            </span>
-            <span className="text-ink/60">
-              {unitLabel}
-              {users > 1 ? " pro Nutzer" : ""}
-            </span>
-          </div>
-
-          {monthlyEquivalentCents !== null && (
-            <p className="mt-1 text-sm text-ink/50">
-              entspricht {formatEuro(monthlyEquivalentCents)} / Monat
-            </p>
-          )}
-
+        <div className="relative mt-10">
           {users > 1 && (
-            <p className="mt-1 text-sm text-ink/50">
-              Gesamt {formatEuro(total)} {unitLabel} für {users} Nutzer
-            </p>
+            <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-coral px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-coral/30">
+              🎉 −{discountPercent} % Familienrabatt
+            </div>
           )}
 
-          <ul className="mt-6 space-y-3">
-            {features.map((feature) => (
-              <li key={feature} className="flex items-start gap-3 text-ink/80">
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green" />
-                {feature}
-              </li>
-            ))}
-          </ul>
-
-          <button
-            type="button"
-            onClick={handleSubscribe}
-            disabled={loading}
-            className="mt-8 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+          <div
+            className={`rounded-3xl border-2 bg-white p-8 pt-10 text-left shadow-[0_10px_40px_rgba(0,0,0,0.06)] sm:p-10 sm:pt-12 ${
+              users > 1 ? "border-coral/40" : "border-blue/30"
+            }`}
           >
-            {loading ? "Wird geladen…" : "Jetzt abonnieren"}
-          </button>
+            <div className="flex flex-wrap items-baseline gap-2">
+              {users > 1 && (
+                <span className="text-xl text-ink/35 line-through">
+                  {formatEuro(singleUserPrice)}
+                </span>
+              )}
+              <span className="font-poppins text-4xl font-bold text-ink">
+                {formatEuro(perUser)}
+              </span>
+              <span className="text-ink/60">
+                {unitLabel}
+                {users > 1 ? " pro Nutzer" : ""}
+              </span>
+            </div>
 
-          {error && (
-            <p className="mt-3 text-sm text-coral" role="alert">
-              {error}
-            </p>
-          )}
+            {monthlyEquivalentCents !== null && (
+              <p className="mt-1 text-sm text-ink/50">
+                entspricht {formatEuro(monthlyEquivalentCents)} / Monat
+              </p>
+            )}
+
+            {users > 1 && (
+              <p className="mt-1 text-sm font-semibold text-coral">
+                Gesamt {formatEuro(total)} {unitLabel} für {users} Nutzer
+              </p>
+            )}
+
+            <ul className="mt-6 space-y-3">
+              {features.map((feature) => (
+                <li key={feature} className="flex items-start gap-3 text-ink/80">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+
+            <button
+              type="button"
+              onClick={handleSubscribe}
+              disabled={loading}
+              className="mt-8 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+            >
+              {loading ? "Wird geladen…" : "Jetzt abonnieren"}
+            </button>
+
+            {error && (
+              <p className="mt-3 text-sm text-coral" role="alert">
+                {error}
+              </p>
+            )}
+          </div>
         </div>
 
         <p className="mt-6 text-sm text-ink/50">
