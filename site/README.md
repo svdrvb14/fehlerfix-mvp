@@ -35,6 +35,8 @@ Trage ein:
   `NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_YEARLY`,
   `NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_MONTHLY`,
   `NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_YEARLY` – siehe Abschnitt 4
+- `STRIPE_COUPON_ID_2_USERS`, `STRIPE_COUPON_ID_3_USERS`,
+  `STRIPE_COUPON_ID_4_USERS` – ebenfalls Abschnitt 4 (Familienabo-Rabatt)
 
 ## 3. Supabase-Migrationen ausführen
 
@@ -52,23 +54,31 @@ Trigger ein, der `user_id` automatisch verknüpft, sobald sich jemand mit
 einer E-Mail-Adresse registriert, die bereits in `subscriptions` existiert
 (z.B. weil vorher schon über Stripe abonniert wurde).
 
-## 4. Stripe-Produkte &amp; Preise verknüpfen
+## 4. Stripe-Produkte, Preise &amp; Familienrabatt-Gutscheine verknüpfen
 
 Das Preismodell hat zwei Dimensionen - Sprachumfang (Einzelsprache oder
 Deutsch+Englisch) und Abrechnung (monatlich/jährlich) - macht also vier
-Preise. Das Familienabo (2-4 Nutzer, -11 %/-22 %/-33 %) läuft dabei **nicht**
-über eigene Preise, sondern über eine Stripe-Mengenstaffel (volume tiering)
-auf jedem der vier Preise: die Website schickt die Nutzeranzahl als
-`quantity` mit, Stripe wendet automatisch den passenden Rabatt-Tier an.
+**normale** Preise, je für einen Nutzer. Das Familienabo (2-4 Nutzer) nutzt
+denselben Preis mit `quantity` = 2/3/4 im Checkout; der Rabatt (-11 %/-22 %/
+-33 %) kommt separat aus drei Prozent-Gutscheinen, die automatisch
+angewendet werden.
 
 1. Stripe Dashboard → **Product catalog** → Produkt "FehlerFix Abo" anlegen
-2. Vier wiederkehrende Preise anlegen (je mit "Pricing model" → **Volume**
-   und aktiviertem "Customer chooses quantity", mit 4 Tiers für 1-4 Nutzer)
-   – die exakten Beträge pro Tier stehen in
-   [`.env.local.example`](./.env.local.example)
-3. Die vier Preis-IDs (`price_...`) in `.env.local` eintragen (siehe oben)
+2. Vier wiederkehrende Standard-Preise anlegen (12 €/Monat, 89,99 €/Jahr,
+   15 €/Monat, 112,49 €/Jahr - siehe [`.env.local.example`](./.env.local.example))
+   und deren Preis-IDs (`price_...`) in `.env.local` eintragen
+3. Unter **Product catalog → Coupons** drei "Percent off"-Gutscheine
+   anlegen (11 %, 22 %, 33 %) - **keine** Promotion Codes dazu erstellen,
+   die Gutschein-IDs direkt in `.env.local` eintragen
+   (`STRIPE_COUPON_ID_2_USERS` etc.)
 4. Im Stripe Dashboard unter **Settings → Billing → Customer portal** das
    Kundenportal aktivieren (wird von `/api/portal` verwendet)
+
+Die drei zusätzlichen "Familienabo"-Preis-Objekte (2/3/4 Nutzer), die beim
+Ausprobieren mit demselben Betrag wie das Einzelabo entstanden sein
+könnten, werden vom Code nicht verwendet - der Rabatt läuft komplett über
+die Gutscheine, nicht über eigene Preise. Können bestehen bleiben oder
+gelöscht werden.
 
 ## 5. Lokales Webhook-Testen mit der Stripe CLI
 
