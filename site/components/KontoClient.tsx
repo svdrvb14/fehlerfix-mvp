@@ -9,7 +9,13 @@ type SubscriptionRow = {
   status: string;
   plan: string | null;
   quantity: number | null;
+  single_language: string | null;
   current_period_end: string | null;
+};
+
+const SINGLE_LANGUAGE_LABELS: Record<string, string> = {
+  de: "Deutsch",
+  en: "Englisch",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -79,7 +85,7 @@ export function KontoClient() {
     let cancelled = false;
     supabase
       .from("subscriptions")
-      .select("status, plan, quantity, current_period_end")
+      .select("status, plan, quantity, single_language, current_period_end")
       .eq("user_id", session.user.id)
       .maybeSingle()
       .then(({ data }) => {
@@ -218,6 +224,10 @@ export function KontoClient() {
     subscription?.quantity && subscription.quantity > 1
       ? ` – ${subscription.quantity} Nutzer`
       : "";
+  const languageLabel =
+    subscription?.single_language && subscription.single_language !== "both"
+      ? ` (${SINGLE_LANGUAGE_LABELS[subscription.single_language] ?? subscription.single_language})`
+      : "";
   const hasActiveSubscription =
     subscription && (subscription.status === "active" || subscription.status === "trialing");
 
@@ -244,7 +254,7 @@ export function KontoClient() {
             <div className="flex justify-between text-sm">
               <span className="text-ink/50">Plan</span>
               <span className="font-semibold text-ink">
-                {planLabel ? `${planLabel}${quantityLabel}` : "–"}
+                {planLabel ? `${planLabel}${quantityLabel}${languageLabel}` : "–"}
               </span>
             </div>
             <div className="flex justify-between text-sm">

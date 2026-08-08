@@ -47,6 +47,9 @@ Die Tabelle `subscriptions` wird **nicht automatisch** angelegt.
    komplett hineinkopieren, **Run** klicken
 3. Danach genauso mit [`supabase/migrations/002_subscriptions_quantity.sql`](./supabase/migrations/002_subscriptions_quantity.sql)
    (fügt die Spalte `quantity` für die gebuchte Nutzeranzahl hinzu)
+4. Danach genauso mit [`supabase/migrations/003_subscriptions_single_language.sql`](./supabase/migrations/003_subscriptions_single_language.sql)
+   (fügt die Spalte `single_language` hinzu - welche Sprache beim
+   Einzelabo gewählt wurde: "de", "en" oder "both" beim Kombi-Paket)
 
 Das legt die Tabelle `subscriptions` an, aktiviert Row Level Security (jede
 Nutzerin/jeder Nutzer darf nur die eigene Zeile lesen) und richtet einen
