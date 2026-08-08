@@ -21,44 +21,56 @@ const PRESS_ITEMS = [
   },
   {
     quote:
-      "„Mir gefällt, dass mit Hilfe von KI individuellere Förderung möglich gemacht wird, als mit herkömmlichen Lehr-/Lernmitteln!“",
-    source: "Schülerin",
+      "„Mir gefällt, dass mit Hilfe von KI individuellere Förderung möglich gemacht wird, als mit herkömmlichen Lehr‑/Lernmitteln!“",
+    source: "Lehrerin",
   },
 ];
 
-// Für einen nahtlosen Loop wird die Liste einmal dupliziert; nach einem
-// vollen Durchlauf springt der Scroll-Container unsichtbar (ohne Animation)
-// zurück an den Anfang, weil Original und Duplikat identisch sind.
-const LOOP_ITEMS = [...PRESS_ITEMS, ...PRESS_ITEMS];
+// Drei Kopien statt einer: der Nutzer soll frei (auch per Hand) in beide
+// Richtungen durchscrollen können, ohne je an einem Rand hängenzubleiben.
+// Sobald die Scroll-Position aus der mittleren Kopie heraus in eine der
+// äußeren driftet - egal ob durch den Auto-Advance oder manuelles Scrollen -
+// wird sie unsichtbar (ohne Animation) um genau eine Satzbreite zurück in
+// die Mitte gesetzt; da alle drei Kopien identisch sind, ist der Sprung
+// nicht sichtbar und es fühlt sich endlos an.
+const LOOP_ITEMS = [...PRESS_ITEMS, ...PRESS_ITEMS, ...PRESS_ITEMS];
 
 // 20rem Kartenbreite (320px) + 1.5rem Abstand (24px), siehe Tailwind-Klassen
 // unten – muss synchron bleiben, falls die Kartengröße geändert wird.
 const CARD_STEP_PX = 344;
+const SET_WIDTH_PX = PRESS_ITEMS.length * CARD_STEP_PX;
 const STEP_INTERVAL_MS = 10000;
 
 export function PressCarousel() {
   const trackRef = useRef<HTMLDivElement>(null);
-  const stepRef = useRef(0);
 
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Start in der mittleren Kopie, damit von Anfang an in beide
+    // Richtungen Platz zum Weiterscrollen ist.
+    track.scrollLeft = SET_WIDTH_PX;
+
+    function wrapIfNeeded() {
+      if (!track) return;
+      if (track.scrollLeft < SET_WIDTH_PX * 0.5) {
+        track.scrollLeft += SET_WIDTH_PX;
+      } else if (track.scrollLeft > SET_WIDTH_PX * 1.5) {
+        track.scrollLeft -= SET_WIDTH_PX;
+      }
+    }
+
+    track.addEventListener("scroll", wrapIfNeeded, { passive: true });
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return () => track.removeEventListener("scroll", wrapIfNeeded);
+    }
 
     let intervalId: number | undefined;
 
     function advance() {
-      const next = stepRef.current + 1;
-      track!.scrollTo({ left: next * CARD_STEP_PX, behavior: "smooth" });
-
-      if (next >= PRESS_ITEMS.length) {
-        window.setTimeout(() => {
-          track!.scrollTo({ left: 0, behavior: "auto" });
-          stepRef.current = 0;
-        }, 600);
-      } else {
-        stepRef.current = next;
-      }
+      track!.scrollTo({ left: track!.scrollLeft + CARD_STEP_PX, behavior: "smooth" });
     }
 
     function start() {
@@ -74,6 +86,7 @@ export function PressCarousel() {
 
     return () => {
       stop();
+      track.removeEventListener("scroll", wrapIfNeeded);
       track.removeEventListener("mouseenter", stop);
       track.removeEventListener("mouseleave", start);
     };
