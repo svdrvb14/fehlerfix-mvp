@@ -1,8 +1,9 @@
-// Gemeinsames Preismodell für PricingSection (Anzeige) und die Checkout-API
-// (Zuordnung zu Stripe-Preisen). Die Beträge hier MÜSSEN exakt zu den
-// unit_amount-Werten der Mengenstaffeln (volume tiers) passen, die in Stripe
-// für die vier Preise hinterlegt sind - siehe .env.local.example für die
-// genaue Einrichtung.
+// Gemeinsames Preismodell für PricingSection (Anzeige) und die Checkout-API.
+// Der Familienrabatt läuft über einen bei Stripe hinterlegten Prozent-
+// Gutschein, der beim Checkout automatisch auf Menge × Basispreis
+// angewendet wird (siehe app/api/checkout/route.ts und
+// .env.local.example) - die Beträge hier bilden also exakt nach, was
+// Stripe am Ende tatsächlich berechnet.
 
 export type Language = "single" | "combo";
 export type Billing = "monthly" | "yearly";
@@ -12,32 +13,32 @@ export const USER_COUNTS: UserCount[] = [1, 2, 3, 4];
 
 // Rabattstufen des Familienabos: der Gesamtbetrag für alle Nutzer wird um
 // diesen Prozentsatz reduziert, sobald mehr als 1 Nutzer gebucht wird.
-const FAMILY_DISCOUNT: Record<UserCount, number> = {
+export const FAMILY_DISCOUNT: Record<UserCount, number> = {
   1: 0,
   2: 0.11,
   3: 0.22,
   4: 0.33,
 };
 
-// Basispreis für einen einzelnen Nutzer, in Cent.
+// Basispreis für einen einzelnen Nutzer, in Cent - identisch mit dem
+// unit_amount des jeweiligen Stripe-Preises.
 const BASE_PRICE_CENTS: Record<Language, Record<Billing, number>> = {
   single: { monthly: 1200, yearly: 8999 },
   combo: { monthly: 1500, yearly: 11249 },
 };
 
-// Preis pro Nutzer (Cent) bei einer bestimmten Nutzeranzahl. Der
-// Gesamtrabatt wird zuerst auf den vollen Betrag gerechnet und danach durch
-// die Nutzeranzahl geteilt (auf ganze Cent gerundet) - das ist exakt das
-// Verfahren, mit dem auch die unit_amount-Werte der Stripe-Volumenstaffeln
-// berechnet wurden.
-export function perUserPriceCents(language: Language, billing: Billing, users: UserCount): number {
+// Gesamtbetrag (Cent) für eine bestimmte Nutzeranzahl: Menge × Basispreis,
+// abzüglich des Familienrabatts - genau die Rechnung, die Stripe beim
+// Checkout durchführt, wenn der passende Gutschein automatisch greift.
+export function totalPriceCents(language: Language, billing: Billing, users: UserCount): number {
   const base = BASE_PRICE_CENTS[language][billing];
-  const idealTotal = Math.round(base * users * (1 - FAMILY_DISCOUNT[users]));
-  return Math.round(idealTotal / users);
+  return Math.round(base * users * (1 - FAMILY_DISCOUNT[users]));
 }
 
-export function totalPriceCents(language: Language, billing: Billing, users: UserCount): number {
-  return perUserPriceCents(language, billing, users) * users;
+// Nur zur Anzeige ("X € pro Nutzer") - rechnerisch aus dem Gesamtbetrag
+// abgeleitet, keine eigene Stripe-Größe.
+export function perUserPriceCents(language: Language, billing: Billing, users: UserCount): number {
+  return Math.round(totalPriceCents(language, billing, users) / users);
 }
 
 export function formatEuro(cents: number): string {
