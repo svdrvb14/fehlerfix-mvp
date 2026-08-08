@@ -12,6 +12,15 @@ function planFromPriceId(priceId?: string | null): string | null {
   return priceId;
 }
 
+// Seit der Stripe-API-Version 2025-03-31.basil liegt current_period_end
+// nicht mehr direkt am Subscription-Objekt, sondern an jedem einzelnen
+// Subscription-Item (wegen Unterstützung für Abos mit mehreren Posten).
+function currentPeriodEndOf(subscription: Stripe.Subscription): number {
+  return (
+    subscription.items.data[0]?.current_period_end ?? Math.floor(Date.now() / 1000)
+  );
+}
+
 async function upsertSubscription(params: {
   email: string;
   stripeCustomerId: string;
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
             stripeSubscriptionId: subscription.id,
             status: subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
-            currentPeriodEnd: subscription.current_period_end,
+            currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }
         break;
@@ -100,7 +109,7 @@ export async function POST(request: NextRequest) {
                 ? "canceled"
                 : subscription.status,
             plan: planFromPriceId(subscription.items.data[0]?.price?.id),
-            currentPeriodEnd: subscription.current_period_end,
+            currentPeriodEnd: currentPeriodEndOf(subscription),
           });
         }
         break;
