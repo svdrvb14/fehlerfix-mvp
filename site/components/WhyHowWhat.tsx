@@ -15,21 +15,30 @@ const CARDS = [
     border: "border-coral/40",
     eyebrow: "Warum",
     title: "Warum es FehlerFix gibt",
-    body: "Gute Schülerinnen und Schüler verlieren jedes Jahr Punkte und Chancen durch Rechtschreibfehler – nicht, weil sie die Regeln nicht lernen könnten, sondern weil ihnen im Trubel des Schulalltags niemand die Zeit nimmt, sie richtig zu erklären. Ein rot angestrichenes Wort sagt: falsch. Es sagt nicht: warum.",
+    body: [
+      "Wir erleben es jeden Tag aus nächster Nähe: In den Klassenzimmern sitzen junge Menschen mit guten Gedanken, starker Logik und großem Potenzial. Aber wenn dann die nächste Arbeit zurückgegeben wird, steht unten drunter eine Note, die nicht ihr Wissen zeigt, sondern nur ihre Unsicherheit in Rechtschreibung, Grammatik, Zeichensetzung aber vor allem auch im Vokabular und Ausdruck.",
+      "Das ist nicht nur ungerecht. Es raubt Selbstbewusstsein und bremst Zukunftschancen aus.",
+      "Und das war der Moment, der uns bewegt hat: Wir müssen das ändern.",
+      "Wir haben FehlerFix entwickelt, weil wir uns nicht damit abfinden können, dass Sprache zur Barriere wird. Wir wollten auch nicht einfach irgendeine App bauen, die stumm rote Striche zieht. Wir wollten eine echte Stütze schaffen. Wie ein Werkzeug, das Lernenden im Schulalltag, in Förderkursen und auf ihrem gesamten Lebensweg die Sicherheit zurückgibt, die sie verdienen.",
+    ],
   },
   {
     id: "wie",
     border: "border-blue/40",
     eyebrow: "Wie",
     title: "Wie FehlerFix funktioniert",
-    body: "FehlerFix liest deine Handschrift aus drei von dir geschriebenen Ausgangstexten. Zusätzlich kannst du auch Klassenarbeiten, oder andere von dir geschriebene Texte hochladen. Die App analysiert diese und erstellt ein Fehlerprofil. Basierend auf diesem bekommst du genau auf dich zugeschnittene Übungen, deinen individuellen Lernpfad und eine Vokabelliste mit Wörtern, die du häufig falsch schreibst. Der integrierte KI-Algorithmus passt sich an dich und deine Fähigkeiten an und entwickelt sich mit dir und deinem Fortschritt weiter, so dass du dich bestens weiterentwickeln kannst.",
+    body: [
+      "FehlerFix liest deine Handschrift aus drei von dir geschriebenen Ausgangstexten. Zusätzlich kannst du auch Klassenarbeiten, oder andere von dir geschriebene Texte hochladen. Die App analysiert diese und erstellt ein Fehlerprofil. Basierend auf diesem bekommst du genau auf dich zugeschnittene Übungen, deinen individuellen Lernpfad und eine Vokabelliste mit Wörtern, die du häufig falsch schreibst. Der integrierte KI-Algorithmus passt sich an dich und deine Fähigkeiten an und entwickelt sich mit dir und deinem Fortschritt weiter, so dass du dich bestens weiterentwickeln kannst.",
+    ],
   },
   {
     id: "was",
     border: "border-green/50",
     eyebrow: "Was",
     title: "Was FehlerFix konkret ist",
-    body: "Eine App fürs iPad mit Apple Pencil, im gesamten DACH-Raum. FehlerFix läuft als Abo: unbegrenzte Übungen, Handschrifterkennung, Fehleranalyse mit Erklärung und ein persönlicher Fortschrittsverlauf, der zeigt, wie sich die Fehlerquote über die Zeit entwickelt.",
+    body: [
+      "Rechtschreibung wird oft unterschätzt, dabei entscheidet sie täglich darüber, wie man wahrgenommen wird. FehlerFix ist die erste App, die Rechtschreibung, Grammatik, Zeichensetzung und Ausdruck nicht nur korrigiert, sondern wirklich versteht, wie du lernst. Für Tablet und Stift entwickelt, wächst FehlerFix mit dir – von der dritten Klasse bis zum Abitur. Kein starres Programm, sondern ein Lernbegleiter, der sich an dich anpasst, nicht umgekehrt. Mit FehlerFix merkt man schnell, wie die eigene Rechtschreibung sich spürbar verbessert und wie aus echten Schwächen messbare Stärken werden. Man wird sicherer, klarer, und das zeigt sich in jedem Text, den man schreibt.",
+    ],
   },
 ];
 
@@ -56,9 +65,11 @@ export function WhyHowWhat() {
               <h2 className="mt-2 text-balance font-poppins text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                 {card.title}
               </h2>
-              <p className="mt-4 text-lg leading-relaxed text-ink/70">
-                {card.body}
-              </p>
+              <div className="mt-4 space-y-4 text-lg leading-relaxed text-ink/70">
+                {card.body.map((paragraph, index) => (
+                  <p key={index}>{paragraph}</p>
+                ))}
+              </div>
             </div>
           </JourneyCardReveal>
         ))}

@@ -110,6 +110,32 @@ function cubicPoint(p0: Point, c1: Point, c2: Point, p1: Point, t: number): Poin
   };
 }
 
+// Ableitung der kubischen Bézier-Kurve bei t, normiert auf Länge 1 - zeigt
+// exakt in die Richtung, in die die Linie an diesem Punkt gerade verläuft.
+function cubicTangent(p0: Point, c1: Point, c2: Point, p1: Point, t: number): Point {
+  const mt = 1 - t;
+  const dx = 3 * mt * mt * (c1.x - p0.x) + 6 * mt * t * (c2.x - c1.x) + 3 * t * t * (p1.x - c2.x);
+  const dy = 3 * mt * mt * (c1.y - p0.y) + 6 * mt * t * (c2.y - c1.y) + 3 * t * t * (p1.y - c2.y);
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: dx / len, y: dy / len };
+}
+
+// Der Stift soll nicht genau am gezeichneten Linienende sitzen (das wirkt
+// wie "in der Linie drin"), sondern ein kleines, aber sichtbares Stück
+// dahinter ansetzen - in exakt der Richtung, in die die Linie an ihrem
+// Stopp-Punkt gerade zeigt. So bleibt der kleine Lücken-Effekt bei allen
+// drei Segmenten korrekt, egal wie ihr Kurvenwinkel dort verläuft.
+const PENCIL_GAP_PX = 16;
+
+function pencilAnchor(seg: Segment): Point {
+  const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
+  const tangent = cubicTangent(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
+  return {
+    x: point.x + tangent.x * PENCIL_GAP_PX,
+    y: point.y + tangent.y * PENCIL_GAP_PX,
+  };
+}
+
 function segmentPathD(seg: Segment): string {
   return `M ${seg.p0.x} ${seg.p0.y} C ${seg.c1.x} ${seg.c1.y}, ${seg.c2.x} ${seg.c2.y}, ${seg.p1.x} ${seg.p1.y}`;
 }
@@ -234,7 +260,7 @@ function SegmentPencil({
   reduced: boolean;
 }) {
   const triggerY = pencilTriggerY(seg.p1.y, seg.p1Height, viewportHeight);
-  const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
+  const point = pencilAnchor(seg);
 
   const opacity = useTransform(scrollY, [triggerY - PENCIL_FADE_PX, triggerY], [0, 1], {
     clamp: true,

@@ -56,7 +56,14 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
     let consumed: boolean[] = [];
     let lock: { y: number; engagedAt: number } | null = null;
     let lastWheelAt = 0;
-    let lastWheelDelta = 0;
+    // Größtes |deltaY| seit Beginn der aktuellen, ununterbrochenen Geste -
+    // NICHT nur das letzte Sample. Ein kurzer, sanfter Scroll kann direkt
+    // am Lock-Punkt ein zufällig winziges Delta haben; würde man einen
+    // Spike nur gegen dieses eine letzte Sample prüfen, könnte die noch
+    // ganz normal abklingende Trägheit direkt danach fälschlich als neue
+    // Geste erkannt werden und den Stopp sofort wieder lösen. Gegen den
+    // bisherigen Höchstwert der Geste zu prüfen macht das robust.
+    let gesturePeakDelta = 0;
     let lastY = window.scrollY;
 
     function remeasure() {
@@ -71,30 +78,34 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       const now = performance.now();
       const delta = event.deltaY;
 
+      // Eine Pause seit dem letzten Wheel-Event beendet die bisherige Geste
+      // - unabhängig davon, ob gerade ein Stopp aktiv ist. Der nächste
+      // Ausschlag zählt dann als eigener, frischer Spitzenwert.
+      if (now - lastWheelAt >= WHEEL_GESTURE_GAP_MS) {
+        gesturePeakDelta = 0;
+        lock = null;
+      }
+
       if (lock) {
         if (delta < 0) {
           // Zurückscrollen ist immer frei - Stopp sofort lösen.
           lock = null;
-          lastWheelAt = now;
-          lastWheelDelta = 0;
-          return;
-        }
-
-        const isNewGestureByPause = now - lastWheelAt >= WHEEL_GESTURE_GAP_MS;
-        const isNewGestureBySpike =
-          Math.abs(delta) >= WHEEL_SPIKE_MIN_DELTA &&
-          Math.abs(delta) > Math.abs(lastWheelDelta) * WHEEL_SPIKE_FACTOR;
-        const heldTooLong = now - lock.engagedAt >= LOCK_MAX_HOLD_MS;
-
-        if (isNewGestureByPause || isNewGestureBySpike || heldTooLong) {
-          lock = null;
         } else {
-          event.preventDefault();
+          const isSpike =
+            Math.abs(delta) >= WHEEL_SPIKE_MIN_DELTA &&
+            Math.abs(delta) > gesturePeakDelta * WHEEL_SPIKE_FACTOR;
+          const heldTooLong = now - lock.engagedAt >= LOCK_MAX_HOLD_MS;
+
+          if (isSpike || heldTooLong) {
+            lock = null;
+          } else {
+            event.preventDefault();
+          }
         }
       }
 
+      gesturePeakDelta = Math.max(gesturePeakDelta, Math.abs(delta));
       lastWheelAt = now;
-      lastWheelDelta = delta;
     }
 
     function handleScroll() {
