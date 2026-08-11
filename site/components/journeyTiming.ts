@@ -14,23 +14,26 @@ export const PENCIL_FADE_PX = 60;
 // Nachdem die Box voll erschienen ist, wird noch diese Distanz "mini bisschen"
 // weitergescrollt, bevor der Bildschirm exakt in der Kartenmitte einrastet.
 export const SETTLE_BUFFER_PX = 90;
-// Mindestdauer, die der Bildschirm eingerastet bleibt – auch eine neue
-// Scroll-Geste löst ihn vorher nicht.
-export const LOCK_MIN_HOLD_MS = 350;
-// Sicherheitsventil: spätestens nach dieser Zeit löst die nächste
-// Abwärts-Geste den Lock, auch ohne erkennbare Pause davor – sonst fühlt
-// sich durchgehendes Scrollen wie "festgefahren" an.
+// Der Stopp ist NICHT zeitgesteuert: er hält exakt so lange, wie die
+// Rest-Trägheit der auslösenden Geste anhält, und löst sich sofort bei
+// einer NEUEN Abwärts-Geste. Eine neue Geste erkennen wir auf zwei Wegen:
+//
+// 1. Pause: seit dem letzten Wheel-Event ist mindestens diese Zeit
+//    vergangen - die alte Geste ist ausgelaufen, das nächste Event ist
+//    eine bewusste neue.
+export const WHEEL_GESTURE_GAP_MS = 250;
+// 2. Delta-Spike: Trackpad-Trägheit klingt monoton ab. Springt der Betrag
+//    eines Wheel-Deltas plötzlich deutlich über das zuletzt gesehene
+//    (abklingende) Delta, hat der Nutzer mitten in die Trägheit hinein neu
+//    geflickt - auch ohne messbare Pause.
+export const WHEEL_SPIKE_FACTOR = 1.75;
+export const WHEEL_SPIKE_MIN_DELTA = 8;
+// Reines Sicherheitsventil gegen Festhängen bei ununterbrochenem
+// Dauerscrollen ohne jede Pause (kein normaler Bestandteil des Verhaltens).
 export const LOCK_MAX_HOLD_MS = 2000;
-// Pause zwischen zwei Wheel-Events, ab der sie als getrennte, bewusste
-// Scroll-Gesten gelten. Nur eine NEUE Geste (nach so einer Pause) löst den
-// Lock – die Rest-Trägheit der Geste, die das Einrasten ausgelöst hat, nicht.
-export const WHEEL_GESTURE_GAP_MS = 280;
 // Wie weit über einen Lock-Punkt zurückgescrollt werden muss, bevor er beim
 // nächsten Runterscrollen wieder einrastet.
 export const RELOCK_MARGIN_PX = 120;
-// Dauer der weichen Einrast-Animation vom Überschieß-Punkt zurück zur
-// Kartenmitte (ease-out, kaum wahrnehmbar).
-export const SETTLE_ANIM_MS = 260;
 
 // Scroll-Position, bei der die Kartenmitte exakt auf der Bildschirmmitte
 // liegt – das ist zugleich der Punkt, an dem der Bildschirm einrastet.
