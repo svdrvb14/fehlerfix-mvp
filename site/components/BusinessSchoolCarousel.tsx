@@ -1,8 +1,20 @@
 import { ScrollReveal } from "./ScrollReveal";
 
-// Echte Fotos vom Deutschlandfinale (Camera Roll), chronologisch sortiert.
+// Echte Fotos vom Deutschlandfinale (Camera Roll). Die Reihenfolge ist bewusst
+// gemischt (nicht chronologisch), damit sich motivisch ähnliche Aufnahmen
+// (z.B. mehrere Bühnen-/Mikro-Momente hintereinander) nicht direkt folgen.
 const PHOTO_COUNT = 23;
-const PHOTOS = Array.from({ length: PHOTO_COUNT }, (_, i) => `/business-school-${i + 1}.jpg`);
+const PHOTO_ORDER = [
+  1, 5, 13, 9, 6, 18, 2, 7, 17, 21, 8, 19, 15, 4, 11, 22, 14, 10, 16, 23, 3, 20, 12,
+];
+const PHOTOS = PHOTO_ORDER.map((n) => `/business-school-${n}.jpg`);
+
+// Salvador läuft auf diesem Foto durch eine Tür; im Hochformat sitzt sein
+// Kopf weit oben im Bild, ein zentrierter object-cover-Zuschnitt würde ihn
+// abschneiden. Deshalb Bild-Position für dieses eine Foto nach oben verschoben.
+const OBJECT_POSITION: Record<string, string> = {
+  "/business-school-7.jpg": "50% 20%",
+};
 
 // Für eine nahtlose Endlos-Schleife wird das Array einmal dupliziert; die
 // CSS-Animation verschiebt genau um -50% der Gesamtbreite.
@@ -41,6 +53,7 @@ export function BusinessSchoolCarousel() {
                 src={src}
                 alt="Foto vom Business@School-Deutschlandfinale"
                 className="h-full w-full object-cover"
+                style={{ objectPosition: OBJECT_POSITION[src] ?? "50% 50%" }}
                 loading="lazy"
               />
             </div>
