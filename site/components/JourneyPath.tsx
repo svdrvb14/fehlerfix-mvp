@@ -126,13 +126,20 @@ function cubicTangent(p0: Point, c1: Point, c2: Point, p1: Point, t: number): Po
 // Stopp-Punkt gerade zeigt. So bleibt der kleine Lücken-Effekt bei allen
 // drei Segmenten korrekt, egal wie ihr Kurvenwinkel dort verläuft.
 const PENCIL_GAP_PX = 16;
+// Das erste Segment (Hero -> Warum) hat eine deutlich kürzere/steilere Kurve
+// als die Segmente zwischen den Karten (andere Distanz, anderer Winkel). Der
+// Stift wird nie rotiert, daher reicht dort der Standard-Abstand nicht aus -
+// die Linie läuft optisch in die feste Stift-Grafik hinein. Für dieses eine
+// Segment deshalb ein größerer Abstand.
+const PENCIL_GAP_OVERRIDES: Record<string, number> = { warum: 46 };
 
 function pencilAnchor(seg: Segment): Point {
   const point = cubicPoint(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
   const tangent = cubicTangent(seg.p0, seg.c1, seg.c2, seg.p1, STOP_FRACTION);
+  const gap = PENCIL_GAP_OVERRIDES[seg.id] ?? PENCIL_GAP_PX;
   return {
-    x: point.x + tangent.x * PENCIL_GAP_PX,
-    y: point.y + tangent.y * PENCIL_GAP_PX,
+    x: point.x + tangent.x * gap,
+    y: point.y + tangent.y * gap,
   };
 }
 
