@@ -9,11 +9,16 @@ const PHOTO_ORDER = [
 ];
 const PHOTOS = PHOTO_ORDER.map((n) => `/business-school-${n}.jpg`);
 
-// Salvador läuft auf diesem Foto durch eine Tür; im Hochformat sitzt sein
-// Kopf weit oben im Bild, ein zentrierter object-cover-Zuschnitt würde ihn
-// abschneiden. Deshalb Bild-Position für dieses eine Foto nach oben verschoben.
+// Beide Fotos sind Hochformat-Aufnahmen, die in die querformatige Karussell-
+// Box gecovert werden. Ohne Anpassung schneidet der zentrierte Zuschnitt
+// Köpfe/Gesichter ab, deshalb je Foto ein passender vertikaler Ausschnitt.
 const OBJECT_POSITION: Record<string, string> = {
-  "/business-school-7.jpg": "50% 20%",
+  // Salvador läuft durch eine Tür; Kopf soll mit Luft darüber im unteren
+  // Bilddrittel sitzen statt mittig angeschnitten zu werden.
+  "/business-school-7.jpg": "50% 0%",
+  // Bühnen-Reihe mit Redner: zentrierter Zuschnitt schneidet alle Gesichter
+  // an der Stirn ab, daher Ausschnitt weiter oben ansetzen.
+  "/business-school-17.jpg": "50% 20%",
 };
 
 // Für eine nahtlose Endlos-Schleife wird das Array einmal dupliziert; die
