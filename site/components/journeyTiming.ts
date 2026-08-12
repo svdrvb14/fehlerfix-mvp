@@ -28,6 +28,13 @@ export const WHEEL_GESTURE_GAP_MS = 250;
 //    geflickt - auch ohne messbare Pause.
 export const WHEEL_SPIKE_FACTOR = 1.75;
 export const WHEEL_SPIKE_MIN_DELTA = 8;
+// Referenzfenster für die Spike-Erkennung: verglichen wird gegen den
+// Höchstwert der letzten X ms, nicht gegen die ganze Geste seit dem
+// Einrasten. Ein kräftiger Ausgangs-Flick soll nicht auf Dauer die Latte
+// für "neue Geste" hochhalten - die Referenz soll mit der tatsächlich
+// abklingenden Trägheit mitschrumpfen, damit ein normaler zweiter Flick
+// kurz danach zuverlässig als neue Geste erkannt wird.
+export const WHEEL_SPIKE_WINDOW_MS = 150;
 // Reines Sicherheitsventil gegen Festhängen bei ununterbrochenem
 // Dauerscrollen ohne jede Pause (kein normaler Bestandteil des Verhaltens).
 export const LOCK_MAX_HOLD_MS = 2000;

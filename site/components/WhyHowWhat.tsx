@@ -16,10 +16,7 @@ const CARDS = [
     eyebrow: "Warum",
     title: "Warum es FehlerFix gibt",
     body: [
-      "Wir erleben es jeden Tag aus nächster Nähe: In den Klassenzimmern sitzen junge Menschen mit guten Gedanken, starker Logik und großem Potenzial. Aber wenn dann die nächste Arbeit zurückgegeben wird, steht unten drunter eine Note, die nicht ihr Wissen zeigt, sondern nur ihre Unsicherheit in Rechtschreibung, Grammatik, Zeichensetzung aber vor allem auch im Vokabular und Ausdruck.",
-      "Das ist nicht nur ungerecht. Es raubt Selbstbewusstsein und bremst Zukunftschancen aus.",
-      "Und das war der Moment, der uns bewegt hat: Wir müssen das ändern.",
-      "Wir haben FehlerFix entwickelt, weil wir uns nicht damit abfinden können, dass Sprache zur Barriere wird. Wir wollten auch nicht einfach irgendeine App bauen, die stumm rote Striche zieht. Wir wollten eine echte Stütze schaffen. Wie ein Werkzeug, das Lernenden im Schulalltag, in Förderkursen und auf ihrem gesamten Lebensweg die Sicherheit zurückgibt, die sie verdienen.",
+      "Wir erleben es jeden Tag aus nächster Nähe: In den Klassenzimmern sitzen junge Menschen mit guten Gedanken, starker Logik und großem Potenzial. Aber wenn dann die nächste Arbeit zurückgegeben wird, steht unten drunter eine Note, die nicht ihr Wissen zeigt, sondern nur ihre Unsicherheit in Rechtschreibung, Grammatik, Zeichensetzung aber vor allem auch im Vokabular und Ausdruck. Das ist nicht nur ungerecht. Es raubt Selbstbewusstsein und bremst Zukunftschancen aus. Und das war der Moment, der uns bewegt hat: Wir müssen das ändern. Wir haben FehlerFix entwickelt, weil wir uns nicht damit abfinden können, dass Sprache zur Barriere wird. Wir wollten auch nicht einfach irgendeine App bauen, die stumm rote Striche zieht. Wir wollten eine echte Stütze schaffen. Wie ein Werkzeug, das Lernenden im Schulalltag, in Förderkursen und auf ihrem gesamten Lebensweg die Sicherheit zurückgibt, die sie verdienen.",
     ],
   },
   {
@@ -52,8 +49,8 @@ export function WhyHowWhat() {
             id={card.id}
             className={
               CARD_SIDE[card.id] === "left"
-                ? "scroll-mt-24 md:mr-auto md:w-[70%]"
-                : "scroll-mt-24 md:ml-auto md:w-[70%]"
+                ? "scroll-mt-24 md:mr-auto md:w-[77%]"
+                : "scroll-mt-24 md:ml-auto md:w-[77%]"
             }
           >
             <div
