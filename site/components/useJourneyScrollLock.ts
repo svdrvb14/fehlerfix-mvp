@@ -8,6 +8,7 @@ import {
   WHEEL_GESTURE_GAP_MS,
   WHEEL_SPIKE_FACTOR,
   WHEEL_SPIKE_MIN_DELTA,
+  WHEEL_SPIKE_WINDOW_MS,
 } from "./journeyTiming";
 
 const MIN_VIEWPORT_WIDTH = 768;
@@ -56,15 +57,22 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
     let consumed: boolean[] = [];
     let lock: { y: number; engagedAt: number } | null = null;
     let lastWheelAt = 0;
-    // Größtes |deltaY| seit Beginn der aktuellen, ununterbrochenen Geste -
-    // NICHT nur das letzte Sample. Ein kurzer, sanfter Scroll kann direkt
-    // am Lock-Punkt ein zufällig winziges Delta haben; würde man einen
-    // Spike nur gegen dieses eine letzte Sample prüfen, könnte die noch
-    // ganz normal abklingende Trägheit direkt danach fälschlich als neue
-    // Geste erkannt werden und den Stopp sofort wieder lösen. Gegen den
-    // bisherigen Höchstwert der Geste zu prüfen macht das robust.
-    let gesturePeakDelta = 0;
+    // Zeitstempel + Betrag der letzten Wheel-Deltas, für die
+    // Spike-Erkennung. Nur ein gleitendes Zeitfenster (statt der ganzen
+    // Geste oder nur des letzten Samples), damit die Referenz mit der
+    // tatsächlich abklingenden Trägheit mitschrumpft: ein kräftiger
+    // Ausgangs-Flick soll nicht auf Dauer die Latte für "neue Geste"
+    // hochhalten, aber ein einzelnes zufällig winziges Sample direkt am
+    // Lock-Punkt soll auch nicht die ganze Referenz auf null reißen.
+    let recentDeltas: { t: number; abs: number }[] = [];
     let lastY = window.scrollY;
+
+    function recentPeak(now: number): number {
+      recentDeltas = recentDeltas.filter((s) => now - s.t <= WHEEL_SPIKE_WINDOW_MS);
+      let peak = 0;
+      for (const s of recentDeltas) peak = Math.max(peak, s.abs);
+      return peak;
+    }
 
     function remeasure() {
       points = measureLockPoints(cardIds);
@@ -79,10 +87,8 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       const delta = event.deltaY;
 
       // Eine Pause seit dem letzten Wheel-Event beendet die bisherige Geste
-      // - unabhängig davon, ob gerade ein Stopp aktiv ist. Der nächste
-      // Ausschlag zählt dann als eigener, frischer Spitzenwert.
+      // - unabhängig davon, ob gerade ein Stopp aktiv ist.
       if (now - lastWheelAt >= WHEEL_GESTURE_GAP_MS) {
-        gesturePeakDelta = 0;
         lock = null;
       }
 
@@ -91,9 +97,9 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
           // Zurückscrollen ist immer frei - Stopp sofort lösen.
           lock = null;
         } else {
+          const peak = recentPeak(now);
           const isSpike =
-            Math.abs(delta) >= WHEEL_SPIKE_MIN_DELTA &&
-            Math.abs(delta) > gesturePeakDelta * WHEEL_SPIKE_FACTOR;
+            Math.abs(delta) >= WHEEL_SPIKE_MIN_DELTA && Math.abs(delta) > peak * WHEEL_SPIKE_FACTOR;
           const heldTooLong = now - lock.engagedAt >= LOCK_MAX_HOLD_MS;
 
           if (isSpike || heldTooLong) {
@@ -104,7 +110,7 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
         }
       }
 
-      gesturePeakDelta = Math.max(gesturePeakDelta, Math.abs(delta));
+      recentDeltas.push({ t: now, abs: Math.abs(delta) });
       lastWheelAt = now;
     }
 

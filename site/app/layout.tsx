@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
+import { StaleChunkReload } from "@/components/StaleChunkReload";
 
 const poppins = Poppins({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang="de" className={poppins.variable}>
       <body className="font-sans antialiased overflow-x-hidden">
+        <StaleChunkReload />
         {children}
       </body>
     </html>
