@@ -3,23 +3,38 @@
 import { useEffect, useRef } from "react";
 import { ScrollReveal } from "./ScrollReveal";
 
-const PRESS_ITEMS = [
+type PressItem =
+  | { type: "quote"; quote: string; source: string }
+  | { type: "link"; title: string; source: string; href: string };
+
+const PRESS_ITEMS: PressItem[] = [
   {
+    type: "link",
+    title:
+      "Rechtschreibung wie aus dem Effeff: Schülerteam aus Wiesbaden hat Deutschlands beste Geschäftsidee",
+    source: "business@school",
+    href: "https://www.businessatschool.de/de/aktuelles/detail/finale-deutschlands-beste-geschaeftsidee-2026",
+  },
+  {
+    type: "quote",
     quote:
       "„Es ist eine exzellente Idee, dass die anvisierte App nicht nur Fehler markiert, sondern diese auch verständlich erklärt.“",
     source: "Sprachwissenschaftler",
   },
   {
+    type: "quote",
     quote:
       "„FehlerFix hat das Potenzial, bestehende erfolgreiche Modelle wie GoStudent, Studienkreis etc. abzulösen – daher kann das ein spannendes Investment für einen Venture Capital Fund sein!“",
     source: "VC-Investor, TX Ventures AG, Zürich",
   },
   {
+    type: "quote",
     quote:
       "„Ich würde mir die App runterladen, da ich einen Verdacht auf LRS habe. Es würde mein Leben um Einiges erleichtern.“",
     source: "Schülerin",
   },
   {
+    type: "quote",
     quote:
       "„Mir gefällt, dass mit Hilfe von KI individuellere Förderung möglich gemacht wird, als mit herkömmlichen Lehr‑/Lernmitteln!“",
     source: "Lehrerin",
@@ -107,15 +122,35 @@ export function PressCarousel() {
         ref={trackRef}
         className="snap-carousel mt-10 flex gap-6 overflow-x-auto px-6 pb-4"
       >
-        {LOOP_ITEMS.map((item, index) => (
-          <div
-            key={`${item.source}-${index}`}
-            className="w-[20rem] shrink-0 snap-center rounded-3xl border border-ink/10 bg-white p-7 shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
-          >
-            <p className="text-lg leading-relaxed text-ink/80">{item.quote}</p>
-            <p className="mt-4 text-sm font-semibold text-ink/50">{item.source}</p>
-          </div>
-        ))}
+        {LOOP_ITEMS.map((item, index) =>
+          item.type === "link" ? (
+            <a
+              key={`${item.source}-${index}`}
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group w-[20rem] shrink-0 snap-center rounded-3xl border border-ink/10 bg-white p-7 shadow-[0_10px_30px_rgba(0,0,0,0.05)] transition duration-150 hover:border-coral/40 hover:shadow-[0_10px_30px_rgba(0,0,0,0.1)]"
+            >
+              <p className="text-lg font-semibold leading-relaxed text-ink group-hover:text-coral">
+                {item.title}
+              </p>
+              <p className="mt-4 flex items-center gap-1.5 text-sm font-semibold text-ink/50">
+                {item.source}
+                <span aria-hidden className="text-ink/30 group-hover:text-coral">
+                  ↗
+                </span>
+              </p>
+            </a>
+          ) : (
+            <div
+              key={`${item.source}-${index}`}
+              className="w-[20rem] shrink-0 snap-center rounded-3xl border border-ink/10 bg-white p-7 shadow-[0_10px_30px_rgba(0,0,0,0.05)]"
+            >
+              <p className="text-lg leading-relaxed text-ink/80">{item.quote}</p>
+              <p className="mt-4 text-sm font-semibold text-ink/50">{item.source}</p>
+            </div>
+          )
+        )}
       </div>
     </section>
   );

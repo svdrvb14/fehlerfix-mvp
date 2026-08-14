@@ -1,3 +1,4 @@
+import { BusinessSchoolAftermovie } from "@/components/BusinessSchoolAftermovie";
 import { BusinessSchoolCarousel } from "@/components/BusinessSchoolCarousel";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
@@ -20,6 +21,7 @@ export default function Home() {
         <WhyHowWhat />
         <TeamSection />
         <BusinessSchoolCarousel />
+        <BusinessSchoolAftermovie />
         <PressCarousel />
         <PricingSection />
       </main>
