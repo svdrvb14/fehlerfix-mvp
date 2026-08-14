@@ -184,38 +184,39 @@ export function PricingSection() {
               users > 1 ? "border-coral/40" : "border-blue/30"
             }`}
           >
-            {/* key erzwingt bei jeder Auswahländerung ein frisches DOM-Element
-                statt eines reinen Textaustauschs im bestehenden Knoten - so
-                kann kein alter, nicht neu gezeichneter Preis stehenbleiben. */}
-            <div
-              key={`${language}-${singleLanguage}-${billing}-${users}`}
-              className="flex flex-wrap items-baseline gap-2"
-            >
-              {users > 1 && (
-                <span className="text-xl text-ink/35 line-through">
-                  {formatEuro(singleUserPrice)}
+            {/* Der GESAMTE auswahlabhängige Preisblock bekommt einen key -
+                nicht nur die erste Zeile. Sonst bleiben die Zusatzzeilen
+                ("entspricht ... / Monat", "Gesamt ...") als reine
+                Textaustausche im bestehenden Knoten stehen und werden vom
+                Browser genauso wenig neu gezeichnet wie zuvor der Preis. */}
+            <div key={`${language}-${singleLanguage}-${billing}-${users}`}>
+              <div className="flex flex-wrap items-baseline gap-2">
+                {users > 1 && (
+                  <span className="text-xl text-ink/35 line-through">
+                    {formatEuro(singleUserPrice)}
+                  </span>
+                )}
+                <span className="font-poppins text-4xl font-bold text-ink">
+                  {formatEuro(perUser)}
                 </span>
+                <span className="text-ink/60">
+                  {unitLabel}
+                  {users > 1 ? " pro Nutzer" : ""}
+                </span>
+              </div>
+
+              {monthlyEquivalentCents !== null && (
+                <p className="mt-1 text-sm text-ink/50">
+                  entspricht {formatEuro(monthlyEquivalentCents)} / Monat
+                </p>
               )}
-              <span className="font-poppins text-4xl font-bold text-ink">
-                {formatEuro(perUser)}
-              </span>
-              <span className="text-ink/60">
-                {unitLabel}
-                {users > 1 ? " pro Nutzer" : ""}
-              </span>
+
+              {users > 1 && (
+                <p className="mt-1 text-sm font-semibold text-coral">
+                  Gesamt {formatEuro(total)} {unitLabel} für {users} Nutzer
+                </p>
+              )}
             </div>
-
-            {monthlyEquivalentCents !== null && (
-              <p className="mt-1 text-sm text-ink/50">
-                entspricht {formatEuro(monthlyEquivalentCents)} / Monat
-              </p>
-            )}
-
-            {users > 1 && (
-              <p className="mt-1 text-sm font-semibold text-coral">
-                Gesamt {formatEuro(total)} {unitLabel} für {users} Nutzer
-              </p>
-            )}
 
             <ul className="mt-6 space-y-3">
               {features.map((feature) => (
