@@ -86,13 +86,20 @@ export function PricingSection() {
 
   return (
     <section id="preise" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
-      <ScrollReveal className="mx-auto max-w-xl text-center">
-        <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-          Preise
-        </h2>
-        <p className="mt-3 text-lg text-ink/70">
-          Ein Abo, alle Funktionen. Für dich allein oder als Familienabo.
-        </p>
+      {/* Nur die statische Überschrift wird eingeblendet. Der interaktive Teil
+          darunter darf NICHT in der Framer-Motion-Ebene liegen: die hält eine
+          dauerhafte Transform-/Compositing-Ebene, in der WebKit Textwechsel
+          teilweise nicht neu zeichnet - dann bleibt der alte Preis sichtbar,
+          obwohl im DOM längst der neue steht (bzw. beide überlagern sich). */}
+      <div className="mx-auto max-w-xl text-center">
+        <ScrollReveal>
+          <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+            Preise
+          </h2>
+          <p className="mt-3 text-lg text-ink/70">
+            Ein Abo, alle Funktionen. Für dich allein oder als Familienabo.
+          </p>
+        </ScrollReveal>
 
         <div className="mx-auto mt-8 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
           <button
@@ -177,7 +184,13 @@ export function PricingSection() {
               users > 1 ? "border-coral/40" : "border-blue/30"
             }`}
           >
-            <div className="flex flex-wrap items-baseline gap-2">
+            {/* key erzwingt bei jeder Auswahländerung ein frisches DOM-Element
+                statt eines reinen Textaustauschs im bestehenden Knoten - so
+                kann kein alter, nicht neu gezeichneter Preis stehenbleiben. */}
+            <div
+              key={`${language}-${singleLanguage}-${billing}-${users}`}
+              className="flex flex-wrap items-baseline gap-2"
+            >
               {users > 1 && (
                 <span className="text-xl text-ink/35 line-through">
                   {formatEuro(singleUserPrice)}
@@ -233,7 +246,7 @@ export function PricingSection() {
         <p className="mt-6 text-sm text-ink/50">
           Jederzeit kündbar. Widerrufsrecht laut gesetzlicher Regelung.
         </p>
-      </ScrollReveal>
+      </div>
     </section>
   );
 }
