@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollReveal } from "./ScrollReveal";
 import {
   FAMILY_DISCOUNT,
@@ -35,6 +35,24 @@ export function PricingSection() {
   const [users, setUsers] = useState<UserCount>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const priceCardRef = useRef<HTMLDivElement>(null);
+
+  // Absicherung gegen einen bekannten WebKit/Safari-Bug: der Preisblock wird
+  // bei jeder Auswahländerung zwar korrekt neu erzeugt (siehe key unten),
+  // aber manche Safari-Versionen malen Text in schnell aufeinanderfolgenden
+  // DOM-Wechseln trotzdem nicht zuverlässig neu (alter Inhalt bleibt sichtbar
+  // stehen, teils überlagert von neuem). Das erzwingt in jedem Fall ein
+  // sauberes Neuzeichnen, unabhängig vom React-Reconciliation-Verhalten.
+  useEffect(() => {
+    const el = priceCardRef.current;
+    if (!el) return;
+    void el.offsetHeight; // synchrones Reflow
+    el.style.transform = "translateZ(0)";
+    const raf = requestAnimationFrame(() => {
+      if (el) el.style.transform = "";
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [language, singleLanguage, billing, users]);
 
   async function handleSubscribe() {
     setError("");
@@ -180,6 +198,7 @@ export function PricingSection() {
           )}
 
           <div
+            ref={priceCardRef}
             className={`rounded-3xl border-2 bg-white p-8 pt-10 text-left shadow-[0_10px_40px_rgba(0,0,0,0.06)] sm:p-10 sm:pt-12 ${
               users > 1 ? "border-coral/40" : "border-blue/30"
             }`}
