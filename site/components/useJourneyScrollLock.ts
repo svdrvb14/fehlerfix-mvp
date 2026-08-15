@@ -57,6 +57,38 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
     let consumed: boolean[] = [];
     let lock: { y: number; engagedAt: number } | null = null;
     let lastWheelAt = 0;
+    // Ein Klick auf einen Anker-Link (Menü, "Jetzt abonnieren" oben, o.ä.)
+    // löst dank scroll-behavior:smooth eine mehrere hundert Millisekunden
+    // lange Scroll-Animation aus, die exakt wie eine Wheel-Geste als
+    // "scroll"-Events bei uns ankommt. Ohne diese Unterscheidung würde der
+    // erste dabei gekreuzte Lock-Punkt greifen und die Zielnavigation mitten
+    // auf der ersten Karte festhalten. Während einer solchen Navigation wird
+    // deshalb kein neuer Stopp eingerastet - erkannt am Klick, beendet
+    // sobald die Scroll-Events eine kurze Weile ausbleiben (funktioniert
+    // ohne Abhängigkeit vom noch nicht überall unterstützten
+    // "scrollend"-Event).
+    let navigating = false;
+    let navigatingIdleTimer: number | undefined;
+
+    function beginNavigation() {
+      navigating = true;
+      lock = null;
+      if (navigatingIdleTimer) window.clearTimeout(navigatingIdleTimer);
+      navigatingIdleTimer = window.setTimeout(endNavigation, 250);
+    }
+    function endNavigation() {
+      navigating = false;
+      lastY = window.scrollY;
+    }
+    function handleClick(event: MouseEvent) {
+      const target = event.target as Element | null;
+      const anchor = target?.closest?.("a[href]");
+      const href = anchor?.getAttribute("href");
+      if (href && href.includes("#")) {
+        beginNavigation();
+      }
+    }
+    document.addEventListener("click", handleClick);
     // Zeitstempel + Betrag der letzten Wheel-Deltas, für die
     // Spike-Erkennung. Nur ein gleitendes Zeitfenster (statt der ganzen
     // Geste oder nur des letzten Samples), damit die Referenz mit der
@@ -117,6 +149,24 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
     function handleScroll() {
       const curr = window.scrollY;
 
+      if (navigating) {
+        // Kein Stopp während einer Link-/Button-ausgelösten Navigation -
+        // dafür jeden dabei passierten Lock-Punkt als "schon gesehen"
+        // markieren, damit direkt danach kein überraschender Stopp beim
+        // nächsten normalen Scrollen auftaucht.
+        if (curr > lastY) {
+          for (let i = 0; i < points.length; i++) {
+            if (!consumed[i] && lastY < points[i] && curr >= points[i]) {
+              consumed[i] = true;
+            }
+          }
+        }
+        lastY = curr;
+        if (navigatingIdleTimer) window.clearTimeout(navigatingIdleTimer);
+        navigatingIdleTimer = window.setTimeout(endNavigation, 250);
+        return;
+      }
+
       if (lock) {
         // Jede Positionsänderung wird noch vor dem Paint zurückgesetzt -
         // die Seite steht optisch felsenfest auf dem Lock-Punkt.
@@ -156,9 +206,11 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
 
     return () => {
       timeouts.forEach(window.clearTimeout);
+      if (navigatingIdleTimer) window.clearTimeout(navigatingIdleTimer);
       window.removeEventListener("resize", remeasure);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("scroll", handleScroll);
+      document.removeEventListener("click", handleClick);
     };
   }, [enabled, cardIds]);
 }

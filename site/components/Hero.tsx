@@ -23,7 +23,7 @@ export function Hero() {
             Jetzt abonnieren
           </a>
           <p id="hero-journey-start" className="text-sm text-ink/50">
-            Für jedes Alter, ab der zweiten Klasse
+            In wenigen Minuten startklar – für jedes Alter ab der zweiten Klasse
           </p>
         </div>
       </div>

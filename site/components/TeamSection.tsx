@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { LinkedInIcon } from "./LinkedInIcon";
 import { ScrollReveal } from "./ScrollReveal";
+import { Wordmark } from "./Wordmark";
 
 const TEAM_LINKEDIN = {
   mariam: "https://www.linkedin.com/in/mariam-barry-b5382b3b6/",
@@ -36,7 +37,7 @@ export function TeamSection() {
       <div className="mx-auto max-w-4xl text-center">
         <ScrollReveal>
           <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-            Das Team hinter FehlerFix
+            Das Team hinter <Wordmark />
           </h2>
         </ScrollReveal>
 

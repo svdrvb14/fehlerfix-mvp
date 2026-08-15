@@ -282,7 +282,7 @@ export function PricingSection() {
         </div>
 
         <p className="mt-6 text-sm text-ink/50">
-          Jederzeit kündbar. Widerrufsrecht laut gesetzlicher Regelung.
+          Kein Risiko: jederzeit kündbar, Widerrufsrecht laut gesetzlicher Regelung.
         </p>
       </div>
     </section>
