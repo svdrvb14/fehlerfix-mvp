@@ -111,7 +111,7 @@ export function PricingSection() {
   const discountPercent = Math.round(FAMILY_DISCOUNT[users] * 100);
 
   return (
-    <section id="preise" className="relative scroll-mt-24 px-6 py-14 sm:py-16">
+    <section id="preise" className="relative scroll-mt-24 px-6 py-16 sm:py-[4.5rem]">
       {/* Nur die statische Überschrift wird eingeblendet. Der interaktive Teil
           darunter darf NICHT in der Framer-Motion-Ebene liegen: die hält eine
           dauerhafte Transform-/Compositing-Ebene, in der WebKit Textwechsel
