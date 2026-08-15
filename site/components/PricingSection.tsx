@@ -111,13 +111,13 @@ export function PricingSection() {
   const discountPercent = Math.round(FAMILY_DISCOUNT[users] * 100);
 
   return (
-    <section id="preise" className="relative scroll-mt-24 px-6 py-16 sm:py-20">
+    <section id="preise" className="relative scroll-mt-24 px-6 py-14 sm:py-16">
       {/* Nur die statische Überschrift wird eingeblendet. Der interaktive Teil
           darunter darf NICHT in der Framer-Motion-Ebene liegen: die hält eine
           dauerhafte Transform-/Compositing-Ebene, in der WebKit Textwechsel
           teilweise nicht neu zeichnet - dann bleibt der alte Preis sichtbar,
           obwohl im DOM längst der neue steht (bzw. beide überlagern sich). */}
-      <div className="mx-auto max-w-xl text-center">
+      <div className="mx-auto max-w-3xl text-center">
         <ScrollReveal>
           <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
             Preise
@@ -127,11 +127,10 @@ export function PricingSection() {
           </p>
         </ScrollReveal>
 
-        {/* Sprachauswahl + Sub-Auswahl (nur bei Einzelsprache) in EINER
-            flex-wrap-Zeile statt zwei fest gestapelten Blöcken - so wächst
-            die Gesamthöhe der Auswahl nicht extra, wenn die Sub-Pillen
-            dazukommen, und die Karte darunter samt "Preise"-Überschrift
-            bleibt eher im sichtbaren Bereich. */}
+        {/* Sprache + Sub-Auswahl + Abrechnung in EINER flex-wrap-Zeile statt
+            gestapelter Blöcke - nur die Nutzeranzahl bleibt eine eigene
+            Zeile. So bleiben Preiskarte und "Preise"-Überschrift auch auf
+            normalen Bildschirmhöhen sichtbar, egal welche Auswahl aktiv ist. */}
         <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-2">
           <div className="inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
             <button
@@ -168,23 +167,23 @@ export function PricingSection() {
               </button>
             </div>
           )}
-        </div>
 
-        <div className="mx-auto mt-3 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setBilling("monthly")}
-            className={pillClass(billing === "monthly")}
-          >
-            Monatlich
-          </button>
-          <button
-            type="button"
-            onClick={() => setBilling("yearly")}
-            className={pillClass(billing === "yearly")}
-          >
-            Jährlich
-          </button>
+          <div className="inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setBilling("monthly")}
+              className={pillClass(billing === "monthly")}
+            >
+              Monatlich
+            </button>
+            <button
+              type="button"
+              onClick={() => setBilling("yearly")}
+              className={pillClass(billing === "yearly")}
+            >
+              Jährlich
+            </button>
+          </div>
         </div>
 
         <div className="mt-4">
@@ -205,7 +204,7 @@ export function PricingSection() {
           </div>
         </div>
 
-        <div className="relative mt-6">
+        <div className="relative mt-5">
           {users > 1 && (
             <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-coral px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-coral/30">
               🎉 −{discountPercent} % Gruppenrabatt
@@ -252,7 +251,7 @@ export function PricingSection() {
               )}
             </div>
 
-            <ul className="mt-6 space-y-3">
+            <ul className="mt-5 space-y-2.5">
               {FEATURES.map((feature) => (
                 <li key={feature.title} className="flex items-start gap-3 text-ink/80">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green" />
@@ -269,7 +268,7 @@ export function PricingSection() {
               type="button"
               onClick={handleSubscribe}
               disabled={loading}
-              className="mt-8 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+              className="mt-6 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
             >
               {loading ? "Wird geladen…" : "Jetzt abonnieren"}
             </button>
