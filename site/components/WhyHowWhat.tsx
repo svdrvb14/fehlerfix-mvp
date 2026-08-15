@@ -42,16 +42,14 @@ const CARDS = [
 export function WhyHowWhat() {
   return (
     <section className="relative px-6 pt-20 pb-20 sm:pt-28 sm:pb-28 md:pb-[24rem]">
-      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[21rem]">
+      <div className="mx-auto flex max-w-5xl flex-col gap-10 md:gap-[14.5rem]">
         {CARDS.map((card) => (
           <JourneyCardReveal
             key={card.id}
             id={card.id}
-            className={
-              CARD_SIDE[card.id] === "left"
-                ? "scroll-mt-24 md:mr-auto md:w-[77%]"
-                : "scroll-mt-24 md:ml-auto md:w-[77%]"
-            }
+            className={`scroll-mt-24 md:w-[77%] ${
+              CARD_SIDE[card.id] === "left" ? "md:mr-auto" : "md:ml-auto"
+            } ${card.id === "warum" ? "md:mt-10" : ""}`}
           >
             <div
               className={`rounded-3xl border-2 bg-white/90 p-8 shadow-[0_10px_40px_rgba(0,0,0,0.06)] backdrop-blur-sm sm:p-10 ${card.border}`}
