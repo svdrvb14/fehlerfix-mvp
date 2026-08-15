@@ -30,7 +30,7 @@ export function BusinessSchoolAftermovie() {
   }, []);
 
   return (
-    <section className="relative px-6 pb-16 sm:pb-20">
+    <section className="relative px-6 pt-12 pb-16 sm:pt-16 sm:pb-20">
       <ScrollReveal className="mx-auto max-w-4xl text-center">
         <h2 className="text-balance font-poppins text-3xl font-bold tracking-tight text-ink sm:text-4xl">
           business@school Aftermovie

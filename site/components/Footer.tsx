@@ -5,7 +5,7 @@ import { Wordmark } from "./Wordmark";
 
 export function Footer() {
   return (
-    <footer className="relative px-6 pb-0 pt-12">
+    <footer className="relative px-6 pb-0 pt-16">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 pb-12 text-center sm:flex-row sm:justify-between sm:text-left">
         <Wordmark className="text-lg" />
 
