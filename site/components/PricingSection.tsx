@@ -15,15 +15,31 @@ import {
 
 type SingleLanguage = "de" | "en";
 
-const BASE_FEATURES = [
-  "Unbegrenzte Übungen",
-  "Handschrifterkennung mit Apple Pencil",
-  "Fehleranalyse mit Erklärung der Regel",
-  "Persönlicher Fortschrittsverlauf",
+const FEATURES = [
+  {
+    title: "Individuelles Fehlerprofil",
+    desc: "FehlerFix erkennt deine persönlichen Fehlermuster in Rechtschreibung, Grammatik, Zeichensetzung, Ausdruck und Vokabular",
+  },
+  {
+    title: "Passgenaue Übungen statt Zufallsaufgaben",
+    desc: "jede Übung ist auf genau deine Schwächen zugeschnitten, nicht generisch",
+  },
+  {
+    title: "Handschrifttraining mit Stylus",
+    desc: "motorische Förderung direkt beim Üben, auf jedem Tablet",
+  },
+  {
+    title: "Unbegrenzte, sich weiterentwickelnde Übungen",
+    desc: "das System passt sich mit jedem deiner Fortschritte neu an",
+  },
+  {
+    title: "Persönlicher Fortschrittsverlauf",
+    desc: "du siehst schwarz auf weiß, wie sich deine Fehlerquote verbessert",
+  },
 ];
 
 function pillClass(active: boolean) {
-  return `rounded-full px-5 py-2 text-sm font-semibold transition duration-150 active:scale-95 ${
+  return `rounded-full px-4 py-1.5 text-sm font-semibold transition duration-150 active:scale-95 ${
     active ? "bg-ink text-white" : "text-ink/60"
   }`;
 }
@@ -94,16 +110,8 @@ export function PricingSection() {
   const monthlyEquivalentCents = billing === "yearly" ? Math.round(perUser / 12) : null;
   const discountPercent = Math.round(FAMILY_DISCOUNT[users] * 100);
 
-  const features =
-    language === "combo"
-      ? ["Rechtschreibung auf Deutsch und Englisch", ...BASE_FEATURES]
-      : [
-          `Rechtschreibung auf ${singleLanguage === "de" ? "Deutsch" : "Englisch"}`,
-          ...BASE_FEATURES,
-        ];
-
   return (
-    <section id="preise" className="relative scroll-mt-24 px-6 py-20 sm:py-28">
+    <section id="preise" className="relative scroll-mt-24 px-6 py-16 sm:py-20">
       {/* Nur die statische Überschrift wird eingeblendet. Der interaktive Teil
           darunter darf NICHT in der Framer-Motion-Ebene liegen: die hält eine
           dauerhafte Transform-/Compositing-Ebene, in der WebKit Textwechsel
@@ -119,41 +127,48 @@ export function PricingSection() {
           </p>
         </ScrollReveal>
 
-        <div className="mx-auto mt-8 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setLanguage("single")}
-            className={pillClass(language === "single")}
-          >
-            Einzelsprache
-          </button>
-          <button
-            type="button"
-            onClick={() => setLanguage("combo")}
-            className={pillClass(language === "combo")}
-          >
-            Deutsch + Englisch
-          </button>
-        </div>
-
-        {language === "single" && (
-          <div className="mx-auto mt-3 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
+        {/* Sprachauswahl + Sub-Auswahl (nur bei Einzelsprache) in EINER
+            flex-wrap-Zeile statt zwei fest gestapelten Blöcken - so wächst
+            die Gesamthöhe der Auswahl nicht extra, wenn die Sub-Pillen
+            dazukommen, und die Karte darunter samt "Preise"-Überschrift
+            bleibt eher im sichtbaren Bereich. */}
+        <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-2">
+          <div className="inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
             <button
               type="button"
-              onClick={() => setSingleLanguage("de")}
-              className={pillClass(singleLanguage === "de")}
+              onClick={() => setLanguage("single")}
+              className={pillClass(language === "single")}
             >
-              Deutsch
+              Einzelsprache
             </button>
             <button
               type="button"
-              onClick={() => setSingleLanguage("en")}
-              className={pillClass(singleLanguage === "en")}
+              onClick={() => setLanguage("combo")}
+              className={pillClass(language === "combo")}
             >
-              Englisch
+              Deutsch + Englisch
             </button>
           </div>
-        )}
+
+          {language === "single" && (
+            <div className="inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setSingleLanguage("de")}
+                className={pillClass(singleLanguage === "de")}
+              >
+                Deutsch
+              </button>
+              <button
+                type="button"
+                onClick={() => setSingleLanguage("en")}
+                className={pillClass(singleLanguage === "en")}
+              >
+                Englisch
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="mx-auto mt-3 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
           <button
@@ -172,7 +187,7 @@ export function PricingSection() {
           </button>
         </div>
 
-        <div className="mt-6">
+        <div className="mt-4">
           <p className="text-sm font-medium text-ink/50">Nutzeranzahl</p>
           <div className="mx-auto mt-2 inline-flex rounded-full border border-ink/10 bg-white p-1 shadow-sm">
             {USER_COUNTS.map((count) => (
@@ -190,10 +205,10 @@ export function PricingSection() {
           </div>
         </div>
 
-        <div className="relative mt-10">
+        <div className="relative mt-6">
           {users > 1 && (
             <div className="absolute left-1/2 top-0 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-coral px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-coral/30">
-              🎉 −{discountPercent} % Familienrabatt
+              🎉 −{discountPercent} % Gruppenrabatt
             </div>
           )}
 
@@ -238,10 +253,14 @@ export function PricingSection() {
             </div>
 
             <ul className="mt-6 space-y-3">
-              {features.map((feature) => (
-                <li key={feature} className="flex items-start gap-3 text-ink/80">
+              {FEATURES.map((feature) => (
+                <li key={feature.title} className="flex items-start gap-3 text-ink/80">
                   <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-green" />
-                  {feature}
+                  <span>
+                    <span className="font-semibold text-ink">{feature.title}</span>
+                    {" – "}
+                    {feature.desc}
+                  </span>
                 </li>
               ))}
             </ul>
