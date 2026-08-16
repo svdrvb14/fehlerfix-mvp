@@ -2,11 +2,11 @@ export const CONTRIBUTE_EMAIL = "contact.us@fehlerfix.com";
 
 export const CONTRIBUTE_ITEMS = [
   {
-    title: "Neues Feature für die App vorschlagen",
+    title: "Neues Feature vorschlagen",
     subject: "Feature-Vorschlag",
   },
   {
-    title: "Featureänderungen vorschlagen",
+    title: "Featureänderung vorschlagen",
     subject: "Featureänderung",
   },
   {
