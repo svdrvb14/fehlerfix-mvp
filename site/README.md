@@ -25,10 +25,11 @@ cp .env.local.example .env.local
 
 Trage ein:
 
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` – Supabase
-  Dashboard → Project Settings → API
+- `NEXT_PUBLIC_SUPABASE_URL` – Supabase Dashboard → Project Settings → API
 - `SUPABASE_SERVICE_ROLE_KEY` – ebenfalls dort (**geheim**, nur serverseitig
-  verwenden, niemals ins Frontend geben)
+  verwenden, niemals ins Frontend geben). Wird nur vom Stripe-Webhook
+  benutzt, um den Abo-Status in `subscriptions` zu schreiben – die Website
+  selbst hat kein eigenes Login mehr.
 - `STRIPE_SECRET_KEY` – Stripe Dashboard → Developers → API keys
 - `STRIPE_WEBHOOK_SECRET` – siehe Abschnitt 5 (lokales Webhook-Testen)
 - `NEXT_PUBLIC_STRIPE_PRICE_ID_SINGLE_MONTHLY`,
@@ -37,6 +38,8 @@ Trage ein:
   `NEXT_PUBLIC_STRIPE_PRICE_ID_COMBO_YEARLY` – siehe Abschnitt 4
 - `STRIPE_COUPON_ID_2_USERS`, `STRIPE_COUPON_ID_3_USERS`,
   `STRIPE_COUPON_ID_4_USERS` – ebenfalls Abschnitt 4 (Familienabo-Rabatt)
+- `NEXT_PUBLIC_STRIPE_PORTAL_LOGIN_URL` – siehe Abschnitt 4 (login-freier
+  Self-Service-Link für "Abo verwalten")
 
 ## 3. Supabase-Migrationen ausführen
 
@@ -74,8 +77,14 @@ angewendet werden.
    anlegen (11 %, 22 %, 33 %) - **keine** Promotion Codes dazu erstellen,
    die Gutschein-IDs direkt in `.env.local` eintragen
    (`STRIPE_COUPON_ID_2_USERS` etc.)
-4. Im Stripe Dashboard unter **Settings → Billing → Customer portal** das
-   Kundenportal aktivieren (wird von `/api/portal` verwendet)
+4. Im Stripe Dashboard unter **Settings → Billing → Customer portal**:
+   Branding (Logo, Farbe, Firmenname) hinterlegen, dann im Abschnitt
+   "Self-service" den Link aktivieren ("Enable link") und die generierte
+   URL (`billing.stripe.com/p/login/...`) als
+   `NEXT_PUBLIC_STRIPE_PORTAL_LOGIN_URL` eintragen. Kunden bestätigen dort
+   selbst ihre E-Mail per Code, den Stripe verschickt – die Seite
+   `/konto` verlinkt nur dorthin, ein eigenes Login-System ist nicht
+   nötig.
 
 Die drei zusätzlichen "Familienabo"-Preis-Objekte (2/3/4 Nutzer), die beim
 Ausprobieren mit demselben Betrag wie das Einzelabo entstanden sein
@@ -135,9 +144,10 @@ Wichtig beim Einrichten in Vercel:
 - Tailwind CSS
 - Framer Motion (`useScroll` + `useTransform`) für den kontinuierlich
   bewegten Hintergrund; respektiert `prefers-reduced-motion`
-- Supabase (`@supabase/supabase-js`) für Auth (Magic Link) und die
+- Supabase (`@supabase/supabase-js`, serverseitig) für die
   `subscriptions`-Tabelle
-- Stripe (`stripe`) für Checkout und Billing Portal
+- Stripe (`stripe`) für Checkout und den login-freien Self-Service-Link
+  zur Abo-Verwaltung (Billing Portal)
 
 ## Offene Platzhalter – vor dem Live-Gang ersetzen
 

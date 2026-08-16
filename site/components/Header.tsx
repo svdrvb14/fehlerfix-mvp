@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/#team", label: "Team" },
   { href: "/#presse", label: "Presse" },
   { href: "/#preise", label: "Preise" },
+  { href: "/kontakt", label: "Kontakt" },
 ];
 
 export function Header() {
@@ -96,7 +97,7 @@ export function Header() {
                   onClick={() => setOpen(false)}
                   className="mt-1 block rounded-xl bg-ink px-4 py-2.5 text-center text-sm font-semibold text-white transition duration-150 hover:bg-ink/90 active:scale-[0.98]"
                 >
-                  Anmelden
+                  Abo verwalten
                 </Link>
               </motion.div>
             )}
