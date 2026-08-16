@@ -70,6 +70,23 @@ export function PricingSection() {
     return () => cancelAnimationFrame(raf);
   }, [language, singleLanguage, billing, users]);
 
+  // "Jetzt abonnieren" verlässt die Seite Richtung Stripe, ohne dass
+  // setLoading(false) je aufgerufen wird (Erfolgsfall braucht das nicht,
+  // die Seite wird ja verlassen). Kommt man per Zurück-Button dahin zurück,
+  // stellt der Browser die Seite oft unverändert aus dem bfcache wieder her
+  // - inklusive des eingefrorenen loading:true, ohne dass irgendein Render
+  // das je auflösen würde. Der Button bliebe für immer auf "Wird geladen…"
+  // hängen und ließe sich nicht mehr klicken.
+  useEffect(() => {
+    function handlePageShow(event: PageTransitionEvent) {
+      if (event.persisted) {
+        setLoading(false);
+      }
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
   async function handleSubscribe() {
     setError("");
     setLoading(true);
