@@ -123,7 +123,6 @@ export function PricingSection() {
 
   const unitLabel = billing === "monthly" ? "/ Monat" : "/ Jahr";
   const perUser = perUserPriceCents(language, billing, users);
-  const total = totalPriceCents(language, billing, users);
   const singleUserPrice = totalPriceCents(language, billing, 1);
   const monthlyEquivalentCents = billing === "yearly" ? Math.round(perUser / 12) : null;
   const discountPercent = Math.round(FAMILY_DISCOUNT[users] * 100);
@@ -268,12 +267,6 @@ export function PricingSection() {
               {monthlyEquivalentCents !== null && (
                 <p className="mt-1 text-sm text-ink/50">
                   entspricht {formatEuro(monthlyEquivalentCents)} / Monat
-                </p>
-              )}
-
-              {users > 1 && (
-                <p className="mt-1 text-sm font-semibold text-coral">
-                  Gesamt {formatEuro(total)} {unitLabel} für {users} Nutzer
                 </p>
               )}
             </div>
