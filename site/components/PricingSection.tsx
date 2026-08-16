@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ScrollReveal } from "./ScrollReveal";
 import {
@@ -219,6 +220,15 @@ export function PricingSection() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="mt-4 flex justify-center">
+          <Link
+            href="/tipps"
+            className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-4 py-1.5 text-sm font-medium text-ink/70 shadow-sm transition duration-150 hover:border-blue/30 hover:text-blue"
+          >
+            💡 Tipps zu den Preisen
+          </Link>
         </div>
 
         <div className="relative mt-5">
