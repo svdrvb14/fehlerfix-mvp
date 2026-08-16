@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { JourneyPath } from "@/components/JourneyPath";
 import { LivingBackground } from "@/components/LivingBackground";
+import { MitwirkenSection } from "@/components/MitwirkenSection";
 import { PressCarousel } from "@/components/PressCarousel";
 import { PricingSection } from "@/components/PricingSection";
 import { TeamSection } from "@/components/TeamSection";
@@ -24,6 +25,7 @@ export default function Home() {
         <BusinessSchoolAftermovie />
         <PressCarousel />
         <PricingSection />
+        <MitwirkenSection />
       </main>
       <Footer />
     </div>

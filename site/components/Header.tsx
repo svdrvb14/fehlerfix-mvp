@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 const NAV_LINKS = [
-  { href: "/#warum", label: "Warum" },
   { href: "/#team", label: "Team" },
   { href: "/#presse", label: "Presse" },
   { href: "/#preise", label: "Preise" },

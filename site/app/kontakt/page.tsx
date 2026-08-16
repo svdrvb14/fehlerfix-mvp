@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
+import { CONTRIBUTE_ITEMS, contributeMailtoHref } from "@/lib/contribute";
 
 export const metadata: Metadata = {
   title: "Kontakt – FehlerFix",
@@ -11,25 +12,6 @@ const TEAM_CONTACTS = [
   { name: "Salvador Elsen", role: "CFO & CTO", email: "salvador.elsen@fehlerfix.com" },
   { name: "Blanca Ostrowicz", role: "COO & CMO", email: "blanca.ostrowicz@fehlerfix.com" },
   { name: "Mariam Barry", role: "CEO & CAO", email: "mariam.barry@fehlerfix.com" },
-];
-
-const CONTRIBUTE_ITEMS = [
-  {
-    title: "Neues Feature für die App vorschlagen",
-    subject: "Feature-Vorschlag",
-  },
-  {
-    title: "Featureänderungen vorschlagen",
-    subject: "Featureänderung",
-  },
-  {
-    title: "Ich habe ein Problem in der App!",
-    subject: "Problem in der App",
-  },
-  {
-    title: "Bugs / Sonstiges, das nicht klappt",
-    subject: "Bug-Report",
-  },
 ];
 
 export default function KontaktPage() {
@@ -88,9 +70,7 @@ export default function KontaktPage() {
           {CONTRIBUTE_ITEMS.map((item) => (
             <li key={item.subject}>
               <a
-                href={`mailto:contact.us@fehlerfix.com?subject=${encodeURIComponent(
-                  `FehlerFix – ${item.subject}`
-                )}`}
+                href={contributeMailtoHref(item.subject)}
                 className="block h-full rounded-2xl border border-ink/10 bg-white px-5 py-4 font-semibold text-ink shadow-sm transition duration-150 hover:border-blue/30 hover:text-blue"
               >
                 {item.title}
