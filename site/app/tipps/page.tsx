@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
+import { ReferralShareButton } from "@/components/ReferralShareButton";
 
 export const metadata: Metadata = {
   title: "Tipps & Aktionen – FehlerFix",
@@ -52,6 +53,7 @@ export default function TippsPage() {
           App weiter – sobald sich dein Freund oder deine Freundin FehlerFix
           holt, bekommst du einen Monat FehlerFix geschenkt.
         </p>
+        <ReferralShareButton />
       </section>
     </LegalPage>
   );
