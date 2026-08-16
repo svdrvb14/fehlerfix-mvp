@@ -13,6 +13,25 @@ const TEAM_CONTACTS = [
   { name: "Mariam Barry", role: "CEO & CAO", email: "mariam.barry@fehlerfix.com" },
 ];
 
+const CONTRIBUTE_ITEMS = [
+  {
+    title: "Neues Feature für die App vorschlagen",
+    subject: "Feature-Vorschlag",
+  },
+  {
+    title: "Featureänderungen vorschlagen",
+    subject: "Featureänderung",
+  },
+  {
+    title: "Ich habe ein Problem in der App!",
+    subject: "Problem in der App",
+  },
+  {
+    title: "Bugs / Sonstiges, das nicht klappt",
+    subject: "Bug-Report",
+  },
+];
+
 export default function KontaktPage() {
   return (
     <LegalPage title="Kontakt">
@@ -50,6 +69,31 @@ export default function KontaktPage() {
                 className="text-sm font-medium text-blue hover:underline"
               >
                 {member.email}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className="font-poppins text-xl font-semibold text-ink">
+          Mitwirken bei FehlerFix
+        </h2>
+        <p className="mt-3">
+          Ideen, Wünsche oder ist etwas kaputt? Klick einfach auf das
+          Passende – dein Mailprogramm öffnet sich mit vorausgefülltem
+          Betreff, du musst nur noch schreiben.
+        </p>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {CONTRIBUTE_ITEMS.map((item) => (
+            <li key={item.subject}>
+              <a
+                href={`mailto:contact.us@fehlerfix.com?subject=${encodeURIComponent(
+                  `FehlerFix – ${item.subject}`
+                )}`}
+                className="block h-full rounded-2xl border border-ink/10 bg-white px-5 py-4 font-semibold text-ink shadow-sm transition duration-150 hover:border-blue/30 hover:text-blue"
+              >
+                {item.title}
               </a>
             </li>
           ))}
