@@ -123,7 +123,7 @@ export function PricingSection() {
             Preise
           </h2>
           <p className="mt-3 text-lg text-ink/70">
-            Ein Abo, alle Funktionen. Für dich allein oder als Familienabo.
+            Ein Abo, alle Funktionen. Für dich allein oder als Gruppenabo.
           </p>
         </ScrollReveal>
 
