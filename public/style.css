@@ -107,7 +107,9 @@ body {
   width: 40px;
   height: 40px;
   background: var(--white);
-  border-radius: 10px;
+  border-radius: 11px;
+  /* hellblaue Kontur wie im Logo */
+  border: 2px solid #cfe1f5;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
