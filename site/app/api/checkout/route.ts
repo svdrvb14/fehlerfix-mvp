@@ -27,6 +27,13 @@ const FAMILY_COUPON_IDS: Partial<Record<UserCount, string | undefined>> = {
   4: process.env.STRIPE_COUPON_ID_4_USERS,
 };
 
+// Ein an den Preisen selbst hinterlegter Standard-Testzeitraum wird von
+// Checkout Sessions nicht zuverlässig übernommen (insbesondere nicht in
+// Kombination mit quantity + Gutschein beim Familienabo) - deshalb hier
+// explizit an der Session gesetzt, gilt für jede Preis-/Nutzeranzahl-
+// Kombination gleich.
+const TRIAL_PERIOD_DAYS = 7;
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const plan: unknown = body?.plan;
@@ -106,6 +113,7 @@ export async function POST(request: NextRequest) {
       // aber am Abo hinterlegt, damit klar ist, welche Sprachversion der
       // Kunde bekommen soll.
       subscription_data: {
+        trial_period_days: TRIAL_PERIOD_DAYS,
         metadata: {
           single_language: language === "single" ? (singleLanguage as string) : "both",
         },
