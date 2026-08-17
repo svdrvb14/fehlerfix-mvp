@@ -53,6 +53,16 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
   useEffect(() => {
     if (!enabled || window.innerWidth < MIN_VIEWPORT_WIDTH) return;
 
+    // Der einzige Weg, einen eingerasteten Stopp wieder zu lösen, läuft
+    // komplett über "wheel"-Events (siehe handleWheel unten: Richtungswechsel,
+    // Spike-Erkennung, Geste-Pause). Ein Touchscreen (iPad & Co.) feuert
+    // niemals "wheel" - nur "scroll", und die kommen ja gerade rein und lösen
+    // erst den Lock aus. Ohne jede Wheel-Events bliebe man an der ersten
+    // Karte für immer hängen, weder vor noch zurück kommt man dann weg -
+    // deshalb auf Geräten mit grobem Zeigegerät (Touch) den Lock erst gar
+    // nicht aktivieren und stattdessen ganz normal frei scrollen lassen.
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+
     let points: number[] = [];
     let consumed: boolean[] = [];
     let lock: { y: number; engagedAt: number } | null = null;
