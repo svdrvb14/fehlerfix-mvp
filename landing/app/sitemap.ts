@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const baseUrl = "https://fehlerfix.info";
+const baseUrl = "https://www.fehlerfix.info";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
