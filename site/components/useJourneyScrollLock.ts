@@ -89,6 +89,29 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       }
     }
     document.addEventListener("click", handleClick);
+
+    // Kommt man per Browser-"Zurück" auf die Seite zurück (z.B. vom
+    // Stripe-Checkout), versucht der Browser selbst, die vorherige
+    // Scroll-Position wiederherzustellen - und tut das messbar animiert
+    // statt in einem Sprung. "pageshow" fängt den Fall ab, in dem die Seite
+    // unverändert aus dem bfcache auftaut (unser Listener hängt dann schon
+    // von VOR dem Einfrieren). Bei einem echten Neuladen dagegen ist die
+    // Wiederherstellung oft schon im Gange, BEVOR React überhaupt gemountet
+    // und dieser Effect gelaufen ist - "pageshow" käme dann zu spät, wir
+    // würden das Event schlicht verpassen. Deshalb startet der Effect
+    // zusätzlich grundsätzlich im "navigating"-Zustand: die ersten 250ms
+    // nach jedem Mount (aus welchem Grund auch immer - erster Aufruf,
+    // Neuladen, Zurück-Navigation) rastet nichts ein, sondern erst sobald
+    // der Scroll für eine kurze Weile zur Ruhe kommt. Ohne all das würde
+    // unser Lock den ERSTEN dabei gekreuzten Punkt sofort einrasten und die
+    // Wiederherstellung mitten auf irgendeiner Karte abwürgen, statt an der
+    // eigentlich gespeicherten Position (z.B. bei "Preise") anzukommen.
+    beginNavigation();
+    function handlePageShow() {
+      beginNavigation();
+    }
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", beginNavigation);
     // Zeitstempel + Betrag der letzten Wheel-Deltas, für die
     // Spike-Erkennung. Nur ein gleitendes Zeitfenster (statt der ganzen
     // Geste oder nur des letzten Samples), damit die Referenz mit der
@@ -211,6 +234,8 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("click", handleClick);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", beginNavigation);
     };
   }, [enabled, cardIds]);
 }
