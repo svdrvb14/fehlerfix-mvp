@@ -1677,6 +1677,8 @@ function renderAuthScreen() {
   });
   document.getElementById('form-class').hidden = authUI.method !== 'class';
   document.getElementById('form-email').hidden = authUI.method !== 'email';
+  // Name nur bei der Registrierung abfragen (Login braucht ihn nicht)
+  document.getElementById('student-name-field').hidden = authUI.studentTab !== 'register';
   document.getElementById('btn-auth-submit').textContent =
     authUI.studentTab === 'login' ? 'Anmelden →' : 'Registrieren →';
   document.getElementById('auth-error').hidden = true;
@@ -1733,7 +1735,11 @@ document.getElementById('btn-auth-submit').addEventListener('click', async () =>
       const email = document.getElementById('in-email').value.trim();
       const password = document.getElementById('in-password').value;
       if (isRegister) {
-        await apiJson('/api/auth/register-email', { method: 'POST', body: JSON.stringify({ email, password, profile: state.profile }) });
+        const displayName = document.getElementById('in-student-name').value.trim();
+        await apiJson('/api/auth/register-email', {
+          method: 'POST',
+          body: JSON.stringify({ email, password, displayName, profile: state.profile }),
+        });
         afterRegister('auth-error', 'Registrierung erfolgreich! Melde dich jetzt mit deiner E-Mail an.');
         return;
       }
@@ -1813,7 +1819,10 @@ async function renderDrawer() {
   if (!u) { userBox.innerHTML = ''; nav.innerHTML = ''; return; }
 
   const name = u.displayName || u.email || 'Angemeldet';
-  const meta = u.role === 'teacher' ? 'Lehrkraft' : (u.authMethod === 'email' ? u.email : 'Schüler/in');
+  // Zweite Zeile: nicht dieselbe Angabe doppelt zeigen
+  const meta = u.role === 'teacher'
+    ? 'Lehrkraft'
+    : (u.displayName && u.email ? u.email : 'Schüler/in');
   userBox.innerHTML = `<div class="du-name">${escapeHtml(name)}</div><div class="du-meta">${escapeHtml(meta)}</div>`;
 
   nav.innerHTML = '';
@@ -1824,6 +1833,36 @@ async function renderDrawer() {
   }
 
   // ── Schüler ──
+  // Name setzen/ändern (vor allem für E-Mail-Schüler, die noch keinen haben)
+  const nameBox = document.createElement('div');
+  nameBox.className = 'drawer-join';
+  nameBox.innerHTML = `
+    <div class="du-meta" style="margin-bottom:6px">${u.displayName ? 'Dein Name' : 'Wie heißt du?'}</div>
+    <input id="drawer-name-input" placeholder="Vorname" autocomplete="given-name"
+           style="text-transform:none" value="${escapeHtml(u.displayName || '')}" />
+    <button class="btn-secondary" id="drawer-name-btn" style="width:100%">Namen speichern</button>
+    <div class="drawer-msg" id="drawer-name-msg"></div>`;
+  nav.appendChild(nameBox);
+  nameBox.querySelector('#drawer-name-btn').onclick = async () => {
+    const val = nameBox.querySelector('#drawer-name-input').value.trim();
+    const msg = nameBox.querySelector('#drawer-name-msg');
+    try {
+      const { user } = await apiJson('/api/auth/update-name', {
+        method: 'POST', body: JSON.stringify({ displayName: val }),
+      });
+      authState.user = user;
+      msg.className = 'drawer-msg ok';
+      msg.textContent = 'Gespeichert!';
+      // Kopfzeile im Menü und Dashboard-Begrüßung aktualisieren
+      userBox.querySelector('.du-name').textContent = user.displayName || user.email || 'Angemeldet';
+      const greet = document.getElementById('sdash-greeting');
+      if (greet) greet.textContent = 'Hallo ' + (user.displayName || '') + '!';
+    } catch (e) {
+      msg.className = 'drawer-msg err';
+      msg.textContent = e.message;
+    }
+  };
+
   // Aktuelle Klasse anzeigen (falls vorhanden); dann Beitreten NUR wenn (noch) keine Klasse.
   const classInfo = document.createElement('div');
   classInfo.className = 'drawer-join';

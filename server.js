@@ -192,10 +192,11 @@ app.get('/api/auth/me', (req, res) => {
 // E-Mail-Registrierung
 app.post('/api/auth/register-email', requireDb, async (req, res) => {
   try {
-    const { email, password, profile } = req.body || {};
+    const { email, password, displayName, profile } = req.body || {};
     await auth.registerEmail({
       email,
       password,
+      displayName,
       profile: normalizeProfile(profile) || {},
     });
     // KEIN Auto-Login: nach der Registrierung soll sich der Nutzer normal anmelden.
@@ -247,6 +248,16 @@ app.post('/api/auth/join-class', requireDb, auth.requireStudent, async (req, res
     const { classCode } = req.body || {};
     const { student, className } = await auth.joinClass(req.student.id, classCode);
     res.json({ user: publicStudent(student), className });
+  } catch (e) {
+    res.status(e.status || 500).json({ error: e.message });
+  }
+});
+
+// Namen nachträglich setzen/ändern (Menü)
+app.post('/api/auth/update-name', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const student = await auth.updateDisplayName(req.student.id, req.body?.displayName);
+    res.json({ user: publicStudent(student) });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }

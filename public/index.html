@@ -21,35 +21,19 @@
     <!-- Navigation -->
     <nav class="nav">
       <button class="nav-brand" id="nav-home" aria-label="Zur Startseite">
-        <span class="nav-logo" aria-hidden="true">
-          <!-- FehlerFix-Logo: Coral-"F", Stift mit Wellenlinie, Blau-"F" -->
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
-            <!-- F oben links (Coral) -->
-            <g fill="var(--coral)">
-              <rect x="2.6" y="2.4" width="1.9" height="8" rx="0.4" />
-              <rect x="2.6" y="2.4" width="5.2" height="1.9" rx="0.4" />
-              <rect x="2.6" y="5.7" width="3.7" height="1.8" rx="0.4" />
-            </g>
-            <!-- Stift (Coral), diagonal von oben rechts nach unten links -->
-            <path d="M16.24 4.94 L18.36 7.06 L11.86 13.56 L9.74 11.44 Z" fill="var(--coral)" />
-            <path d="M9.74 11.44 L11.86 13.56 L8.96 14.34 Z" fill="var(--coral)" />
-            <!-- Wellenlinie unter dem Stift -->
-            <path d="M4.0 16.4 q0.85 -1.2 1.7 0 t1.7 0 t1.7 0"
-                  stroke="var(--coral)" stroke-width="1.5" stroke-linecap="round" fill="none" />
-            <!-- F unten rechts (Blau) -->
-            <g fill="var(--blue)">
-              <rect x="16" y="13.2" width="1.9" height="8" rx="0.4" />
-              <rect x="16" y="13.2" width="5.2" height="1.9" rx="0.4" />
-              <rect x="16" y="16.5" width="3.7" height="1.8" rx="0.4" />
-            </g>
-          </svg>
-        </span>
+        <img class="nav-logo" src="/logo-icon.png" alt="" aria-hidden="true" />
         <span class="nav-title"><span class="brand-fehler">Fehler</span><span class="brand-fix">Fix</span></span>
       </button>
       <div class="nav-links">
         <button class="nav-link" data-modal="anleitung">Anleitung</button>
         <button class="nav-link" data-modal="ueber">Über uns</button>
-        <button class="nav-login" id="btn-open-menu" hidden>Menü</button>
+        <button class="nav-login" id="btn-open-menu" hidden>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+          Menü
+        </button>
       </div>
     </nav>
 
@@ -102,6 +86,10 @@
 
             <!-- E-Mail-Formular (Schüler) -->
             <div class="auth-form" id="form-email" hidden>
+              <div id="student-name-field" hidden>
+                <label class="auth-label">Dein Name</label>
+                <input class="auth-input" id="in-student-name" placeholder="Vorname" autocomplete="given-name" />
+              </div>
               <label class="auth-label">E-Mail</label>
               <input class="auth-input" id="in-email" type="email" placeholder="name@beispiel.de" autocomplete="email" />
               <label class="auth-label">Passwort</label>
