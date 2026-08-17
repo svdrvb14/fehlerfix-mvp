@@ -432,12 +432,18 @@ function updateProfileContinue() {
 }
 
 document.getElementById('btn-profile-continue').addEventListener('click', () => {
+  // Nach der Profil-Auswahl: Wie soll die Datengrundlage entstehen?
+  showScreen('onboarding-choice');
+});
+
+// Startet den Schreib-Teil des Onboardings (3 handschriftliche Texte)
+function startWritingOnboarding() {
   state.selectedTopics = pickRandomTopics(3, state.profile.grade);
   state.currentTopicIndex = 0;
   state.capturedImages = [];
   loadTopic(0);
   showScreen('write');
-});
+}
 
 // ─────────────────────────────────────────────────────────
 // Screen-Wechsel
@@ -953,9 +959,14 @@ async function runAnalysis() {
   showScreen('loading');
   setLoadingText('FehlerFix analysiert deine Texte...', 'Bereite deine Texte vor...');
   try {
+    // Datengrundlage = hochgeladene Texte (falls vorhanden) + geschriebene Texte
+    const sources = [
+      ...(typeof onboarding !== 'undefined' ? onboarding.uploadImages : []),
+      ...state.capturedImages,
+    ];
     // Kleinere Bilder = kleinerer Body = robuster über WLAN/iPad-Hotspots
     const small = [];
-    for (const img of state.capturedImages) {
+    for (const img of sources) {
       small.push(await downscaleImage(img, 1000, 0.72));
     }
     const kb = Math.round(small.reduce((s, d) => s + d.length * 0.75, 0) / 1024);
@@ -1038,7 +1049,15 @@ function handleSessionLost(body) {
 // ─────────────────────────────────────────────────────────
 // Screen 3: Ready → Erste Übung
 // ─────────────────────────────────────────────────────────
-document.getElementById('btn-start-exercises').addEventListener('click', loadNextExercise);
+// Nach der Analyse: NICHT direkt in eine Übung, sondern aufs Dashboard.
+// (Im Gast-Modus ohne Login gibt es kein Dashboard → dann direkt zur Übung.)
+document.getElementById('btn-start-exercises').addEventListener('click', async () => {
+  if (authState.user && authState.user.role === 'student') {
+    await backToDashboard();
+  } else {
+    loadNextExercise();
+  }
+});
 
 // ─────────────────────────────────────────────────────────
 // Screen 4: Übung – Aufgabe oben, Canvas unten
@@ -1570,9 +1589,11 @@ async function enterStudentApp() {
   try {
     const dash = await apiJson('/api/student/dashboard');
     if (dash.hasAnalysis) {
+      // Fehlerprofil existiert → immer aufs Dashboard (nie direkt in eine Übung)
       showStudentDashboard(dash);
     } else {
-      showScreen('welcome'); // noch keine Ausgangstexte → Onboarding
+      // Erstes Mal: Willkommen → Profil → Auswahl der Datengrundlage
+      showScreen('welcome');
     }
   } catch (e) {
     showScreen('welcome');
@@ -1999,50 +2020,315 @@ document.getElementById('btn-sdash-practice').addEventListener('click', () => {
 // Neue Ausgangstexte schreiben (Onboarding erneut)
 document.getElementById('btn-sdash-reanalyze').addEventListener('click', () => {
   sdashMsg('');
-  const p = state.profile || {};
-  state.selectedTopics = pickRandomTopics(3, p.grade);
-  state.currentTopicIndex = 0;
-  state.capturedImages = [];
-  loadTopic(0);
-  showScreen('write');
+  onboarding.choice = 'write';
+  onboarding.uploadImages = [];
+  onboarding.pendingWrite = false;
+  startWritingOnboarding();
 });
 
 // Klassenarbeit hochladen: Kamera/Datei
+// "Texte hochladen" vom Dashboard → Upload-Screen im Nachtrag-Modus
 document.getElementById('btn-sdash-classtest').addEventListener('click', () => {
-  document.getElementById('classtest-input').click();
+  sdashMsg('');
+  onboarding.choice = 'add';       // Nachtrag: mergt ins bestehende Profil
+  onboarding.pendingWrite = false;
+  openUploadScreen();
 });
-document.getElementById('classtest-input').addEventListener('change', async (e) => {
-  const file = e.target.files && e.target.files[0];
-  e.target.value = ''; // Reset für erneute Auswahl
-  if (!file) return;
-  sdashMsg('Klassenarbeit wird ausgewertet… das dauert einen Moment.', 'info');
-  try {
-    const dataUrl = await fileToDataUrl(file);
-    const small = await downscaleImage(dataUrl, 1400, 0.8);
-    const res = await apiJson('/api/upload-classtest', {
-      method: 'POST',
-      body: JSON.stringify({ image: small }),
-    });
-    sdashMsg(
-      `Fertig! ${res.detectedCount || 0} Übungsfelder aus deiner Klassenarbeit erkannt. ` +
-        `Sie fließen jetzt in deine Übungen ein.`,
-      'ok'
-    );
-    refreshStudentDashboard();
-  } catch (err) {
-    sdashMsg(err.message || 'Das hat nicht geklappt. Versuch es nochmal.', 'err');
-  }
+// (Der frühere versteckte Datei-Input wurde durch den Upload-Screen ersetzt.)
+
+/* ═══════════════════════════════════════════════════════════
+ * ONBOARDING-AUSWAHL · BILD-UPLOAD · DASHBOARD-SEITEN
+ * ═══════════════════════════════════════════════════════════ */
+
+// Onboarding-Ablauf: welcher Weg wurde gewählt, was steht noch aus
+const onboarding = {
+  choice: null,        // 'upload' | 'write' | 'both'
+  uploadImages: [],    // base64-Bilder der hochgeladenen Texte
+  pendingWrite: false, // nach dem Upload noch die 3 Texte schreiben?
+};
+
+// ─── Auswahl-Screen ───
+document.querySelectorAll('#screen-onboarding-choice [data-choice]').forEach((card) => {
+  card.addEventListener('click', () => {
+    onboarding.choice = card.dataset.choice;
+    onboarding.uploadImages = [];
+    onboarding.pendingWrite = onboarding.choice !== 'upload';
+
+    if (onboarding.choice === 'write') {
+      startWritingOnboarding();
+    } else {
+      openUploadScreen();
+    }
+  });
 });
 
-// Hilfsfunktion: File → dataURL
+// ─── Upload-Screen ───
+function openUploadScreen() {
+  onboarding.uploadImages = [];
+  renderUploadPreview();
+  const skipBtn = document.getElementById('btn-upload-skip');
+  const isAdd = onboarding.choice === 'add';
+  // Bei "beides" kann man den Upload überspringen; im Nachtrag-Modus abbrechen
+  skipBtn.hidden = onboarding.choice !== 'both' && !isAdd;
+  skipBtn.textContent = isAdd ? 'Abbrechen' : 'Überspringen';
+  document.getElementById('upload-kicker').textContent = isAdd ? 'Dashboard' : 'Datengrundlage';
+  document.getElementById('upload-title').textContent = isAdd
+    ? 'Weitere Texte hochladen'
+    : 'Texte hochladen';
+  document.getElementById('upload-lead').textContent =
+    isAdd
+      ? 'Lade Klassenarbeiten oder Aufsätze hoch. FehlerFix schaut sie sich an und verfeinert dein Fehlerprofil.'
+      : onboarding.choice === 'both'
+        ? 'Zuerst: Fotografiere Texte, die du schon geschrieben hast. Danach schreibst du noch drei kurze Texte.'
+        : 'Wähle Fotos von Texten, die du geschrieben hast – oder mach direkt ein neues Foto. Je mehr, desto besser lernt FehlerFix dich kennen.';
+  showScreen('upload');
+}
+
+document.getElementById('btn-pick-camera').addEventListener('click', () => {
+  document.getElementById('upload-camera-input').click();
+});
+document.getElementById('btn-pick-files').addEventListener('click', () => {
+  document.getElementById('upload-files-input').click();
+});
+
+['upload-camera-input', 'upload-files-input'].forEach((id) => {
+  document.getElementById(id).addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    for (const f of files) {
+      try {
+        const raw = await fileToDataUrl(f);
+        const small = await downscaleImage(raw, 1400, 0.8);
+        onboarding.uploadImages.push(small);
+      } catch (err) {
+        console.error('[upload] Bild konnte nicht gelesen werden', err);
+      }
+    }
+    e.target.value = ''; // gleiche Datei erneut wählbar machen
+    renderUploadPreview();
+  });
+});
+
+// Datei → base64 DataURL
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(r.result);
-    r.onerror = reject;
-    r.readAsDataURL(file);
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 
-// ─── Start ───
+function renderUploadPreview() {
+  const wrap = document.getElementById('upload-preview');
+  const hint = document.getElementById('upload-hint');
+  const cont = document.getElementById('btn-upload-continue');
+  wrap.innerHTML = '';
+  onboarding.uploadImages.forEach((src, i) => {
+    const div = document.createElement('div');
+    div.className = 'upload-thumb';
+    div.innerHTML = `<img src="${src}" alt="Bild ${i + 1}"><button aria-label="Entfernen">×</button>`;
+    div.querySelector('button').onclick = () => {
+      onboarding.uploadImages.splice(i, 1);
+      renderUploadPreview();
+    };
+    wrap.appendChild(div);
+  });
+  const n = onboarding.uploadImages.length;
+  hint.textContent = n === 0
+    ? 'Noch keine Bilder ausgewählt.'
+    : `${n} Bild${n === 1 ? '' : 'er'} ausgewählt.`;
+  cont.disabled = n === 0;
+}
+
+document.getElementById('btn-upload-skip').addEventListener('click', () => {
+  onboarding.uploadImages = [];
+  if (onboarding.choice === 'add') {
+    backToDashboard();          // Nachtrag abgebrochen
+  } else {
+    startWritingOnboarding();   // Upload überspringen → drei Texte
+  }
+});
+
+document.getElementById('btn-upload-continue').addEventListener('click', async () => {
+  if (onboarding.choice === 'both') {
+    // Bilder merken, jetzt noch die drei Texte schreiben
+    startWritingOnboarding();
+    return;
+  }
+  if (onboarding.choice === 'add') {
+    // Nachtrag: ins bestehende Fehlerprofil einmischen
+    await uploadAdditionalTexts();
+    return;
+  }
+  // Nur Upload beim Onboarding → analysieren
+  runAnalysis();
+});
+
+/** Lädt zusätzliche Texte hoch und mergt sie ins bestehende Fehlerprofil. */
+async function uploadAdditionalTexts() {
+  const images = onboarding.uploadImages.slice();
+  if (!images.length) return;
+  showScreen('loading');
+  setLoadingText('FehlerFix schaut sich deine Texte an...', 'Das dauert einen Moment.');
+  startLoadingRotation();
+  try {
+    // Der Endpoint nimmt ein Bild pro Aufruf → nacheinander senden
+    for (const image of images) {
+      const res = await fetch('/api/upload-classtest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Server-Fehler (HTTP ${res.status})`);
+      }
+    }
+    stopLoadingRotation();
+    onboarding.uploadImages = [];
+    await backToDashboard();
+    sdashMsg('Danke! Deine Texte sind ausgewertet – dein Fehlerprofil ist jetzt genauer.');
+  } catch (e) {
+    stopLoadingRotation();
+    showError(friendlyFetchError(e, 'dem Hochladen'), () => backToDashboard());
+  }
+}
+
+// ─── Dashboard-Kacheln ───
+document.getElementById('btn-sdash-profile').addEventListener('click', showMyProfile);
+document.getElementById('btn-sdash-leaderboard').addEventListener('click', () => showLeaderboard('week'));
+document.getElementById('btn-sdash-gamification').addEventListener('click', showGamification);
+
+// "Zurück zum Dashboard"-Links auf allen Unterseiten
+document.querySelectorAll('[data-back-dash]').forEach((btn) => {
+  btn.addEventListener('click', backToDashboard);
+});
+
+async function backToDashboard() {
+  try {
+    const dash = await apiJson('/api/student/dashboard');
+    showStudentDashboard(dash);
+  } catch (e) {
+    showScreen('student-dash');
+  }
+}
+
+// ─── Mein Fehlerprofil (Schülersicht) ───
+async function showMyProfile() {
+  showScreen('my-profile');
+  const el = document.getElementById('my-profile-content');
+  el.innerHTML = '<div class="dash-empty">Lade dein Fehlerprofil…</div>';
+  try {
+    const d = await apiJson('/api/student/profile-detail');
+    const bars = (d.errorProfile || []).map((f) => {
+      const m = Math.round(f.mastery ?? 0);
+      const color = m < 40 ? 'var(--coral)' : m < 70 ? '#e0a83d' : '#6dbe7a';
+      const label = m < 40 ? 'Üben wir noch' : m < 70 ? 'Wird schon besser' : 'Sitzt gut';
+      return `<div class="feature-bar-row">
+        <div class="feature-bar-label"><span>${escapeHtml(f.name)}</span><span>${label} · ${m}%</span></div>
+        <div class="feature-bar-track"><div class="feature-bar-fill" style="width:${m}%;background:${color}"></div></div>
+      </div>`;
+    }).join('') || '<div class="dash-empty">Noch keine Daten – mach erst ein paar Übungen.</div>';
+
+    const recent = (d.recentExercises || []).map((r) =>
+      `<div class="feature-bar-label"><span>${escapeHtml(r.feature || '–')}</span><span>${r.score ?? '–'}%</span></div>`
+    ).join('') || '<div class="dash-empty">Noch keine Übungen.</div>';
+
+    el.innerHTML = `
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Dein Stand</div>
+        <p>Level <b>${d.level}</b> · ${d.points} Punkte · ${d.exercisesCompleted} Übungen · 🔥 ${d.streakDays} Tage</p>
+      </div>
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Deine Themen</div>
+        <div style="margin-top:14px">${bars}</div>
+      </div>
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Letzte Übungen</div>
+        <div style="margin-top:14px">${recent}</div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ─── Bestenliste ───
+async function showLeaderboard(range) {
+  showScreen('leaderboard');
+  document.querySelectorAll('[data-lbrange]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.lbrange === range);
+    b.onclick = () => showLeaderboard(b.dataset.lbrange);
+  });
+  const el = document.getElementById('leaderboard-content');
+  el.innerHTML = '<div class="dash-empty">Lade Bestenliste…</div>';
+  try {
+    const d = await apiJson('/api/student/leaderboard?range=' + range);
+    if (!d.inClass) {
+      el.innerHTML = '<div class="dash-empty">Du bist noch in keiner Klasse. Tritt über das Menü einer Klasse bei, dann siehst du hier die Bestenliste.</div>';
+      return;
+    }
+    if (!d.entries.length) {
+      el.innerHTML = '<div class="dash-empty">Noch keine Daten in deiner Klasse.</div>';
+      return;
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    el.innerHTML = d.entries.map((e, i) => `
+      <div class="lb-row${e.id === d.meId ? ' is-me' : ''}">
+        <span class="lb-rank">${medals[i] || i + 1}</span>
+        <span class="lb-name">${escapeHtml(e.name)}${e.id === d.meId ? ' (du)' : ''}</span>
+        <span class="lb-score">${e.score} <span style="font-weight:400;color:var(--muted);font-size:.82rem">${escapeHtml(e.detail || '')}</span></span>
+      </div>`).join('');
+  } catch (e) {
+    el.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// ─── Abzeichen (Gerüst – Logik folgt später) ───
+const BADGES = [
+  { icon: '🌱', name: 'Erster Schritt', desc: 'Erste Übung geschafft', check: (d) => d.exercisesCompleted >= 1 },
+  { icon: '🔥', name: 'Dranbleiber', desc: '3 Tage in Folge geübt', check: (d) => d.streakDays >= 3 },
+  { icon: '⭐', name: 'Wochenheld', desc: '7 Tage in Folge geübt', check: (d) => d.streakDays >= 7 },
+  { icon: '📚', name: 'Fleißig', desc: '10 Übungen gemacht', check: (d) => d.exercisesCompleted >= 10 },
+  { icon: '🚀', name: 'Level 2', desc: 'Level 2 erreicht', check: (d) => d.level >= 2 },
+  { icon: '🏅', name: 'Punktesammler', desc: '100 Punkte gesammelt', check: (d) => d.points >= 100 },
+];
+
+async function showGamification() {
+  showScreen('gamification');
+  const grid = document.getElementById('badge-grid');
+  grid.innerHTML = '<div class="dash-empty">Lade Abzeichen…</div>';
+  try {
+    const d = await apiJson('/api/student/dashboard');
+    grid.innerHTML = BADGES.map((b) => {
+      const earned = b.check(d);
+      return `<div class="badge-card${earned ? '' : ' locked'}">
+        <div class="badge-icon">${b.icon}</div>
+        <div class="badge-name">${escapeHtml(b.name)}</div>
+        <div class="badge-desc">${escapeHtml(b.desc)}</div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    grid.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// Vom Fortschritts-Screen zurück aufs Dashboard (nur für eingeloggte Schüler sinnvoll)
+document.getElementById('btn-progress-dash').addEventListener('click', backToDashboard);
+
+// Der Dashboard-Link auf dem Fortschritts-Screen ist im Gast-Modus nutzlos → ausblenden
+(function hideDashLinkForGuests() {
+  const check = () => {
+    const btn = document.getElementById('btn-progress-dash');
+    if (btn) btn.style.display =
+      authState.user && authState.user.role === 'student' ? 'block' : 'none';
+  };
+  // nach dem Auth-Init einmal setzen + bei jedem Screenwechsel auf progress
+  setTimeout(check, 800);
+  new MutationObserver(check).observe(document.getElementById('screen-progress'), {
+    attributes: true, attributeFilter: ['class'],
+  });
+})();
+
+// ─── Start: Auth prüfen und passenden Screen zeigen ───
+// (ganz am Ende, damit alle Event-Handler vorher registriert sind)
 initAuth();

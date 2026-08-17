@@ -284,6 +284,40 @@ app.get('/api/student/dashboard', requireDb, auth.requireStudent, async (req, re
   }
 });
 
+// Fehlerprofil in Schülersicht (gleiche Daten wie beim Lehrer)
+app.get('/api/student/profile-detail', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const st = await store.loadStudentState(req.student.id, req.student.profile);
+    const featureTable = (st.featureTable || []).slice().sort(
+      (a, b) => (a.mastery ?? 100) - (b.mastery ?? 100)
+    );
+    res.json({
+      errorProfile: featureTable,
+      level: st.level || 1,
+      points: st.points || 0,
+      exercisesCompleted: st.exercisesCompleted || 0,
+      streakDays: st.streakDays || 0,
+      recentExercises: (st.exerciseHistory || []).slice(-10).reverse(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Fehlerprofil konnte nicht geladen werden.' });
+  }
+});
+
+// Bestenliste der eigenen Klasse ( ?range=week|all )
+app.get('/api/student/leaderboard', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    if (!req.student.class_id) {
+      return res.json({ inClass: false, entries: [], meId: req.student.id });
+    }
+    const range = req.query.range === 'all' ? 'all' : 'week';
+    const entries = await store.getClassLeaderboard(req.student.class_id, range);
+    res.json({ inClass: true, range, entries, meId: req.student.id });
+  } catch (e) {
+    res.status(500).json({ error: 'Bestenliste konnte nicht geladen werden.' });
+  }
+});
+
 // Klassenarbeit-Upload: ein Foto → Fehler erkennen → ins Fehlerprofil mergen
 app.post('/api/upload-classtest', requireDb, auth.requireStudent, async (req, res) => {
   const { image } = req.body || {};

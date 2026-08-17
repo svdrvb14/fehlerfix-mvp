@@ -173,15 +173,131 @@
             </div>
           </div>
 
-          <div class="sdash-actions">
-            <button class="btn-primary btn-lg" id="btn-sdash-practice">Übung starten →</button>
-            <button class="btn-secondary" id="btn-sdash-classtest">📸 Klassenarbeit hochladen</button>
-            <button class="btn-secondary" id="btn-sdash-reanalyze">Neue Ausgangstexte schreiben</button>
-          </div>
-          <div class="sdash-msg" id="sdash-msg" hidden></div>
+          <!-- Haupt-Aktion -->
+          <button class="btn-primary btn-lg sdash-main-cta" id="btn-sdash-practice">Übung starten →</button>
 
-          <!-- verstecktes Datei-/Kamera-Input für Klassenarbeit -->
-          <input type="file" id="classtest-input" accept="image/*" capture="environment" hidden />
+          <!-- Kachel-Menü -->
+          <div class="sdash-tiles">
+            <button class="sdash-tile" id="btn-sdash-profile">
+              <span class="tile-icon">🎯</span>
+              <span class="tile-title">Mein Fehlerprofil</span>
+              <span class="tile-sub">Wo du gerade stehst</span>
+            </button>
+            <button class="sdash-tile" id="btn-sdash-classtest">
+              <span class="tile-icon">📸</span>
+              <span class="tile-title">Texte hochladen</span>
+              <span class="tile-sub">Arbeiten &amp; Aufsätze</span>
+            </button>
+            <button class="sdash-tile" id="btn-sdash-leaderboard">
+              <span class="tile-icon">🏆</span>
+              <span class="tile-title">Bestenliste</span>
+              <span class="tile-sub">Wer übt am meisten?</span>
+            </button>
+            <button class="sdash-tile" id="btn-sdash-gamification">
+              <span class="tile-icon">🎖️</span>
+              <span class="tile-title">Abzeichen</span>
+              <span class="tile-sub">Deine Erfolge</span>
+            </button>
+          </div>
+
+          <button class="link-action sdash-link" id="btn-sdash-reanalyze">Neue Ausgangstexte schreiben</button>
+          <div class="sdash-msg" id="sdash-msg" hidden></div>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Onboarding-Auswahl (Datengrundlage) ──── -->
+      <section class="screen" id="screen-onboarding-choice">
+        <div class="choice-wrap">
+          <div class="kicker">Fast geschafft</div>
+          <h1 class="title-l">Jetzt lernt FehlerFix dich kennen</h1>
+          <p class="lead">
+            Damit wir dir die richtigen Übungen bauen können, schauen wir uns zuerst an,
+            wie du schreibst. Wähle, womit wir anfangen sollen.
+          </p>
+
+          <div class="choice-cards">
+            <button class="choice-card" data-choice="upload">
+              <span class="cc-icon">📸</span>
+              <span class="cc-title">Texte hochladen</span>
+              <span class="cc-desc">Fotografiere Klassenarbeiten, Aufsätze oder andere Texte, die du schon geschrieben hast.</span>
+            </button>
+            <button class="choice-card" data-choice="write">
+              <span class="cc-icon">✏️</span>
+              <span class="cc-title">Drei Texte schreiben</span>
+              <span class="cc-desc">Schreibe drei kurze Texte direkt hier in der App – ganz mit der Hand.</span>
+            </button>
+            <button class="choice-card choice-card-wide" data-choice="both">
+              <span class="cc-icon">✨</span>
+              <span class="cc-title">Beides – am genauesten</span>
+              <span class="cc-desc">Erst Texte hochladen, dann drei Texte schreiben. So kennt dich FehlerFix am besten.</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Bilder hochladen ─────────────────────── -->
+      <section class="screen" id="screen-upload">
+        <div class="upload-wrap">
+          <div class="kicker" id="upload-kicker">Datengrundlage</div>
+          <h1 class="title-l" id="upload-title">Texte hochladen</h1>
+          <p class="lead" id="upload-lead">
+            Wähle Fotos von Texten, die du geschrieben hast – oder mach direkt ein neues Foto.
+            Je mehr, desto besser lernt FehlerFix dich kennen.
+          </p>
+
+          <div class="upload-buttons">
+            <button class="btn-secondary" id="btn-pick-camera">📷&nbsp; Foto aufnehmen</button>
+            <button class="btn-secondary" id="btn-pick-files">🖼️&nbsp; Aus Dateien / Fotos</button>
+          </div>
+          <input type="file" id="upload-camera-input" accept="image/*" capture="environment" hidden />
+          <input type="file" id="upload-files-input" accept="image/*" multiple hidden />
+
+          <div class="upload-preview" id="upload-preview"></div>
+          <div class="upload-hint" id="upload-hint">Noch keine Bilder ausgewählt.</div>
+
+          <div class="upload-actions">
+            <button class="link-action" id="btn-upload-skip">Überspringen</button>
+            <button class="btn-primary btn-lg" id="btn-upload-continue" disabled>Weiter →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Mein Fehlerprofil (Schülersicht) ─────── -->
+      <section class="screen" id="screen-my-profile">
+        <div class="dash-wrap">
+          <button class="link-action" data-back-dash>← Zurück zum Dashboard</button>
+          <div class="kicker">Dein Lernstand im Detail</div>
+          <h1 class="title-l">Mein Fehlerprofil</h1>
+          <p class="lead">
+            Hier siehst du, welche Themen dir schon gut liegen und wo wir noch üben.
+            Je voller der Balken, desto sicherer bist du.
+          </p>
+          <div id="my-profile-content"></div>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Bestenliste ──────────────────────────── -->
+      <section class="screen" id="screen-leaderboard">
+        <div class="dash-wrap">
+          <button class="link-action" data-back-dash>← Zurück zum Dashboard</button>
+          <div class="kicker">Deine Klasse</div>
+          <h1 class="title-l">Bestenliste</h1>
+          <div class="lb-tabs">
+            <button class="auth-tab active" data-lbrange="week">Diese Woche</button>
+            <button class="auth-tab" data-lbrange="all">Insgesamt</button>
+          </div>
+          <div id="leaderboard-content"></div>
+        </div>
+      </section>
+
+      <!-- ── SCREEN: Abzeichen / Gamification ─────────────── -->
+      <section class="screen" id="screen-gamification">
+        <div class="dash-wrap">
+          <button class="link-action" data-back-dash>← Zurück zum Dashboard</button>
+          <div class="kicker">Deine Erfolge</div>
+          <h1 class="title-l">Abzeichen</h1>
+          <p class="lead">Sammle Abzeichen, indem du regelmäßig übst und besser wirst.</p>
+          <div class="badge-grid" id="badge-grid"></div>
         </div>
       </section>
 
@@ -312,11 +428,12 @@
       <section class="screen" id="screen-ready">
         <div class="ready">
           <div class="ready-emoji">✨</div>
-          <h2 class="title-l">Dein Übungsprogramm ist fertig!</h2>
+          <h2 class="title-l">Dein Fehlerprofil steht!</h2>
           <p class="lead">
-            Wir haben dir Übungen zusammengestellt, die genau zu dir passen. Los geht's mit der ersten!
+            FehlerFix kennt dich jetzt. Auf deinem Dashboard findest du deine Übungen,
+            deinen Fortschritt und alles andere.
           </p>
-          <button class="btn-primary btn-lg" id="btn-start-exercises">Erste Übung starten →</button>
+          <button class="btn-primary btn-lg" id="btn-start-exercises">Zum Dashboard →</button>
         </div>
       </section>
 
@@ -425,7 +542,8 @@
             <p id="explanation-text"></p>
           </div>
 
-          <button class="btn-primary btn-lg" id="btn-next-exercise">Weiter zum Lernen →</button>
+          <button class="btn-primary btn-lg" id="btn-next-exercise">Nächste Übung →</button>
+          <button class="link-action" id="btn-progress-dash" style="display:block;margin:14px auto 0">Zurück zum Dashboard</button>
         </div>
       </section>
 

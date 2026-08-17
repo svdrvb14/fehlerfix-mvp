@@ -1843,3 +1843,255 @@ body {
 .canvas-expand:hover {
   background: var(--blue-soft);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ONBOARDING-AUSWAHL · UPLOAD · DASHBOARD-KACHELN ·
+   FEHLERPROFIL · BESTENLISTE · ABZEICHEN
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Onboarding-Auswahl ─── */
+.choice-wrap {
+  max-width: 780px;
+  margin: 20px auto 0;
+  text-align: center;
+}
+.choice-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 28px;
+}
+.choice-card {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  padding: 26px 22px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all 0.16s ease;
+}
+.choice-card:hover {
+  border-color: var(--coral);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(236, 110, 104, 0.18);
+}
+.choice-card-wide {
+  grid-column: 1 / -1;
+}
+.cc-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.cc-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.cc-desc {
+  font-size: 0.95rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ─── Upload-Screen ─── */
+.upload-wrap {
+  max-width: 700px;
+  margin: 20px auto 0;
+  text-align: center;
+}
+.upload-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.upload-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.upload-thumb {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  aspect-ratio: 3 / 4;
+}
+.upload-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.upload-thumb button {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(20, 25, 40, 0.65);
+  color: white;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.upload-hint {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin-bottom: 22px;
+}
+.upload-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+/* ─── Dashboard: Haupt-CTA + Kacheln ─── */
+.sdash-main-cta {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin: 26px auto 22px;
+}
+.sdash-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.sdash-tile {
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  padding: 20px 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+.sdash-tile:hover {
+  border-color: var(--blue);
+  transform: translateY(-2px);
+}
+.tile-icon {
+  font-size: 1.9rem;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.tile-title {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--ink);
+}
+.tile-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.sdash-link {
+  display: block;
+  margin: 0 auto;
+}
+
+/* ─── Bestenliste ─── */
+.lb-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  margin: 16px 0 20px;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: white;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 8px rgba(0, 0, 0, 0.05);
+  border: 2px solid transparent;
+}
+.lb-row.is-me {
+  border-color: var(--coral);
+  background: var(--coral-soft);
+}
+.lb-rank {
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: var(--muted);
+  min-width: 32px;
+}
+.lb-name {
+  flex: 1;
+  font-weight: 700;
+}
+.lb-score {
+  font-weight: 800;
+  color: var(--blue-medium);
+  white-space: nowrap;
+}
+
+/* ─── Abzeichen ─── */
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.badge-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px 14px;
+  text-align: center;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+.badge-card.locked {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.badge-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.badge-name {
+  font-weight: 800;
+  font-size: 0.98rem;
+  margin-bottom: 3px;
+}
+.badge-desc {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 760px) {
+  .choice-cards {
+    grid-template-columns: 1fr;
+  }
+  .sdash-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Zurück-Link auf Unterseiten etwas absetzen */
+.dash-wrap > .link-action:first-child {
+  display: inline-block;
+  margin-bottom: 14px;
+}
