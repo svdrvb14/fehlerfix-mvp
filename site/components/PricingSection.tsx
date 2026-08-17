@@ -290,7 +290,7 @@ export function PricingSection() {
               disabled={loading}
               className="mt-6 w-full rounded-full bg-coral px-7 py-3.5 text-center font-semibold text-white shadow-md transition duration-150 hover:bg-coral/90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
             >
-              {loading ? "Wird geladen…" : "Jetzt abonnieren"}
+              {loading ? "Wird geladen…" : "7 Tage kostenlos testen"}
             </button>
 
             {error && (
@@ -302,7 +302,8 @@ export function PricingSection() {
         </div>
 
         <p className="mt-6 text-sm text-ink/50">
-          Kein Risiko: jederzeit kündbar, Widerrufsrecht laut gesetzlicher Regelung.
+          7 Tage kostenlos testen, danach jederzeit kündbar. Widerrufsrecht
+          laut gesetzlicher Regelung.
         </p>
       </div>
     </section>
