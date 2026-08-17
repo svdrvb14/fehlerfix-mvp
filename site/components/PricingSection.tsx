@@ -237,6 +237,39 @@ export function PricingSection() {
             </div>
           )}
 
+          {/* Ab lg: genug Platz rechts neben der Karte für den Hinweis samt
+              handgezeichnetem Pfeil. Darunter reicht kein Platz mehr dafür -
+              da gibt es stattdessen den einfachen Link unter der Karte. */}
+          <div className="pointer-events-none absolute -right-4 top-8 hidden w-44 translate-x-full lg:block">
+            <svg
+              width="130"
+              height="100"
+              viewBox="0 0 130 100"
+              fill="none"
+              className="text-coral"
+              aria-hidden
+            >
+              <path
+                d="M8 6 C 70 2, 112 36, 100 82"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M100 82 L 91 68 M100 82 L 111 73"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              />
+            </svg>
+            <Link
+              href="/warum-so-teuer"
+              className="pointer-events-auto -mt-1 ml-6 inline-block whitespace-nowrap text-sm font-semibold text-coral hover:underline"
+            >
+              warum so teuer?
+            </Link>
+          </div>
+
           <div
             ref={priceCardRef}
             className={`rounded-3xl border-2 bg-white p-8 pt-10 text-left shadow-[0_10px_40px_rgba(0,0,0,0.06)] sm:p-10 sm:pt-12 ${
@@ -298,6 +331,15 @@ export function PricingSection() {
                 {error}
               </p>
             )}
+          </div>
+
+          <div className="mt-3 text-center lg:hidden">
+            <Link
+              href="/warum-so-teuer"
+              className="text-sm font-semibold text-coral hover:underline"
+            >
+              warum so teuer?
+            </Link>
           </div>
         </div>
 
