@@ -42,6 +42,14 @@ export const LOCK_MAX_HOLD_MS = 2000;
 // nächsten Runterscrollen wieder einrastet.
 export const RELOCK_MARGIN_PX = 120;
 
+// Touchscreens (iPad & Co.) feuern nie "wheel"-Events, nur "touchstart" /
+// "touchmove" / "touchend" - der Stopp braucht dafür ein eigenes, an Touch
+// angepasstes Löse-Kriterium statt Pause/Spike: wie weit der Finger seit
+// dem Einrasten (bzw. seit dem letzten Aufsetzen) tatsächlich gezogen
+// wurde, in beide Richtungen gleich behandelt (anders als beim Wheel, wo
+// Zurückscrollen immer sofort frei ist).
+export const TOUCH_RELEASE_PX = 18;
+
 // Scroll-Position, bei der die Kartenmitte exakt auf der Bildschirmmitte
 // liegt – das ist zugleich der Punkt, an dem der Bildschirm einrastet.
 export function centerLockY(cardTop: number, cardHeight: number, viewportHeight: number): number {
