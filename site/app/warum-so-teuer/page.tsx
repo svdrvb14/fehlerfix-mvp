@@ -59,12 +59,12 @@ export default function WarumSoTeuerPage() {
 
       <section>
         <h2 className="font-poppins text-xl font-semibold text-ink">
-          Vier Bereiche, nicht nur einer
+          Fünf Bereiche, nicht nur einer
         </h2>
         <p className="mt-3">
           Wir kümmern uns nicht nur um Rechtschreibung, sondern auch um
           Grammatik, Zeichensetzung, Vokabular und – oft unterschätzt –
-          deinen Ausdruck. Vier Kompetenzbereiche, die zusammen erst
+          deinen Ausdruck. Fünf Kompetenzbereiche, die zusammen erst
           wirklich zeigen, wie gut jemand schreiben kann.
         </p>
       </section>

@@ -34,6 +34,12 @@ const FAMILY_COUPON_IDS: Partial<Record<UserCount, string | undefined>> = {
 // Kombination gleich.
 const TRIAL_PERIOD_DAYS = 7;
 
+// Erscheint auf der von Stripe gehosteten Checkout-Seite direkt unter dem
+// Preis/Button - macht schon dort klar, dass die 7 Tage unverbindlich
+// sind und man danach genauso einfach wieder kündigen kann.
+const CANCEL_HINT =
+  "Du kannst dein Abo jederzeit kündigen – auch schon während der 7 Tage kostenlosen Testphase, ohne dass danach etwas abgebucht wird.";
+
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const plan: unknown = body?.plan;
@@ -109,6 +115,9 @@ export async function POST(request: NextRequest) {
       success_url: `${origin}/konto?checkout=success`,
       cancel_url: `${origin}/#preise`,
       customer_email: email,
+      custom_text: {
+        submit: { message: CANCEL_HINT },
+      },
       // Sprachwahl beim Einzelabo hat keinen Einfluss auf den Preis, wird
       // aber am Abo hinterlegt, damit klar ist, welche Sprachversion der
       // Kunde bekommen soll.
