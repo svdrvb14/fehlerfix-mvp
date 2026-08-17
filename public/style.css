@@ -2097,3 +2097,12 @@ body {
   display: inline-block;
   margin-bottom: 14px;
 }
+
+/* Notizbuch-Aktionen nicht umbrechen lassen (⌫ Rückgängig) */
+.notebook-actions .link-action {
+  white-space: nowrap;
+}
+.notebook-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}

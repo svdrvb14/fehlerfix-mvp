@@ -474,8 +474,6 @@ function showError(message, retryAction) {
 function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
   const ctx = canvasEl.getContext('2d');
   let drawing = false;
-  let lastX = 0;
-  let lastY = 0;
   let tool = 'pen';
   let drawn = false;
 
@@ -547,20 +545,6 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     return { x: x - rect.left, y: y - rect.top };
   }
 
-  function applyStrokeStyle() {
-    if (tool === 'eraser') {
-      // destination-out löscht Pixel statt sie weiß zu übermalen →
-      // die CSS-Schullinien darunter werden wieder sichtbar
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-      ctx.lineWidth = 24;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = '#1a1a2e';
-      ctx.lineWidth = 2.5;
-    }
-  }
-
   // Undo-Historie: vor jedem neuen Strich einen Schnappschuss sichern
   const history = [];
   function pushHistory() {
@@ -572,25 +556,58 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     } catch (e) { /* ignorieren */ }
   }
 
+  // ─── Weiche Striche ───────────────────────────────────
+  // Statt harter Geraden von Messpunkt zu Messpunkt (das wirkt eckig) zeichnen
+  // wir quadratische Bézier-Kurven: die Kurve läuft durch die MITTELPUNKTE
+  // benachbarter Messpunkte, der Messpunkt selbst ist der Kontrollpunkt.
+  // Ergebnis: durchgehend runde Züge wie mit einem echten Stift.
+  const PEN_WIDTH = 2.6;
+  const ERASER_WIDTH = 24;
+  const MIN_STEP = 0.7; // Messpunkte, die enger liegen, sind nur Zittern
+
+  let strokePts = [];   // Messpunkte des laufenden Strichs
+  let curWidth = PEN_WIDTH;
+
+  const midPoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+  // Leicht geschwindigkeitsabhängige Strichstärke: schnelle Züge etwas dünner.
+  // Bewusst dezent (0.82–1.18), damit die Schrift für die KI gut lesbar bleibt.
+  function widthFor(dist) {
+    if (tool === 'eraser') return ERASER_WIDTH;
+    const f = Math.max(0.82, Math.min(1.18, 1.18 - dist * 0.022));
+    curWidth += (PEN_WIDTH * f - curWidth) * 0.35; // weich nachziehen
+    return curWidth;
+  }
+
+  function beginStrokeStyle(width) {
+    if (tool === 'eraser') {
+      // destination-out löscht Pixel statt sie weiß zu übermalen →
+      // die CSS-Schullinien darunter werden wieder sichtbar
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#1a1a2e';
+    }
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }
+
   function startDraw(e) {
     e.preventDefault();
     pushHistory(); // Zustand VOR diesem Strich merken (für Rückgängig)
     drawing = true;
-    const { x, y } = pointerPos(e);
-    lastX = x;
-    lastY = y;
-    applyStrokeStyle();
-    if (tool === 'eraser') {
-      ctx.beginPath();
-      ctx.arc(x, y, 12, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,0,0,1)';
-      ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.arc(x, y, 1.25, 0, Math.PI * 2);
-      ctx.fillStyle = '#1a1a2e';
-      ctx.fill();
-    }
+    const p = pointerPos(e);
+    strokePts = [p];
+    curWidth = tool === 'eraser' ? ERASER_WIDTH : PEN_WIDTH;
+
+    // Startpunkt setzen, damit auch ein kurzes Antippen sichtbar ist
+    beginStrokeStyle(curWidth);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, curWidth / 2, 0, Math.PI * 2);
+    ctx.fillStyle = tool === 'eraser' ? 'rgba(0,0,0,1)' : '#1a1a2e';
+    ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
     setDrawn(true);
   }
@@ -598,20 +615,56 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
   function moveDraw(e) {
     if (!drawing) return;
     e.preventDefault();
-    const { x, y } = pointerPos(e);
-    applyStrokeStyle();
+    const p = pointerPos(e);
+    const prev = strokePts[strokePts.length - 1];
+    const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
+    if (dist < MIN_STEP) return; // Zittern herausfiltern
+    strokePts.push(p);
+
+    const n = strokePts.length;
+    beginStrokeStyle(widthFor(dist));
     ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(x, y);
+
+    if (n === 2) {
+      // Stichanfang: vom echten Startpunkt bis zur ersten Mitte
+      const m = midPoint(strokePts[0], strokePts[1]);
+      ctx.moveTo(strokePts[0].x, strokePts[0].y);
+      ctx.lineTo(m.x, m.y);
+    } else {
+      // Kurve von Mitte zu Mitte, der reale Messpunkt krümmt sie
+      const p0 = strokePts[n - 3];
+      const p1 = strokePts[n - 2];
+      const p2 = strokePts[n - 1];
+      const m1 = midPoint(p0, p1);
+      const m2 = midPoint(p1, p2);
+      ctx.moveTo(m1.x, m1.y);
+      ctx.quadraticCurveTo(p1.x, p1.y, m2.x, m2.y);
+    }
     ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
-    lastX = x;
-    lastY = y;
+
+    // Wir brauchen immer nur die letzten drei Punkte
+    if (strokePts.length > 3) strokePts.splice(0, strokePts.length - 3);
   }
 
   function endDraw(e) {
-    if (drawing && e && e.preventDefault) e.preventDefault();
+    if (e && e.cancelable && e.preventDefault) e.preventDefault();
+    if (!drawing) return;
+    // Letztes Stück von der Mitte bis zum tatsächlichen Endpunkt schließen
+    const n = strokePts.length;
+    if (n >= 2) {
+      const p1 = strokePts[n - 2];
+      const p2 = strokePts[n - 1];
+      const m = midPoint(p1, p2);
+      beginStrokeStyle(curWidth);
+      ctx.beginPath();
+      ctx.moveTo(m.x, m.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+    }
     drawing = false;
+    strokePts = [];
   }
 
   // Klassische Maus + Touch (Apple Pencil zählt auf iPad als Touch).
