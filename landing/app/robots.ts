@@ -6,6 +6,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://fehlerfix.info/sitemap.xml",
+    sitemap: "https://www.fehlerfix.info/sitemap.xml",
   };
 }
