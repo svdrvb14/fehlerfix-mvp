@@ -5,6 +5,7 @@ import {
   centerLockY,
   LOCK_MAX_HOLD_MS,
   RELOCK_MARGIN_PX,
+  TOUCH_RELEASE_PX,
   WHEEL_GESTURE_GAP_MS,
   WHEEL_SPIKE_FACTOR,
   WHEEL_SPIKE_MIN_DELTA,
@@ -49,19 +50,12 @@ function scrollToInstant(top: number) {
 //   Pause seit dem letzten Wheel-Event ODER an einem Delta-Spike mitten in
 //   abklingender Trägheit. Keine Mindesthaltezeit: wer direkt weiter will,
 //   flickt einfach erneut. Hochscrollen löst immer sofort.
+// - Touch (iPad & Co.) hat kein "wheel" - dort löst stattdessen, wie weit
+//   der Finger seit dem Aufsetzen tatsächlich gezogen wurde (siehe
+//   handleTouchMove/TOUCH_RELEASE_PX unten), in beide Richtungen gleich.
 export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolean) {
   useEffect(() => {
     if (!enabled || window.innerWidth < MIN_VIEWPORT_WIDTH) return;
-
-    // Der einzige Weg, einen eingerasteten Stopp wieder zu lösen, läuft
-    // komplett über "wheel"-Events (siehe handleWheel unten: Richtungswechsel,
-    // Spike-Erkennung, Geste-Pause). Ein Touchscreen (iPad & Co.) feuert
-    // niemals "wheel" - nur "scroll", und die kommen ja gerade rein und lösen
-    // erst den Lock aus. Ohne jede Wheel-Events bliebe man an der ersten
-    // Karte für immer hängen, weder vor noch zurück kommt man dann weg -
-    // deshalb auf Geräten mit grobem Zeigegerät (Touch) den Lock erst gar
-    // nicht aktivieren und stattdessen ganz normal frei scrollen lassen.
-    if (window.matchMedia("(pointer: coarse)").matches) return;
 
     let points: number[] = [];
     let consumed: boolean[] = [];
@@ -179,6 +173,46 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       lastWheelAt = now;
     }
 
+    // Touchscreens (iPad & Co.) feuern nie "wheel" - der Stopp braucht hier
+    // ein eigenes Löse-Kriterium über touchstart/-move/-end statt Pause/
+    // Spike: wie weit der Finger seit dem Aufsetzen (bzw. seit dem
+    // Einrasten, falls der Stopp mitten in der laufenden Geste greift -
+    // siehe touchStartY-Reset unten in handleScroll) tatsächlich gezogen
+    // wurde. Erst ab TOUCH_RELEASE_PX gilt das als bewusste neue Geste und
+    // löst den Stopp - beide Richtungen gleich behandelt, keine
+    // Mindesthaltezeit.
+    let currentTouchY: number | null = null;
+    let touchStartY: number | null = null;
+
+    function handleTouchStart(event: TouchEvent) {
+      const y = event.touches[0]?.clientY;
+      currentTouchY = y ?? null;
+      touchStartY = currentTouchY;
+    }
+
+    function handleTouchMove(event: TouchEvent) {
+      const y = event.touches[0]?.clientY;
+      if (y === undefined) return;
+      currentTouchY = y;
+
+      if (!lock || touchStartY === null) return;
+
+      const dragged = touchStartY - y;
+      if (Math.abs(dragged) >= TOUCH_RELEASE_PX) {
+        // Bewusste neue Geste - Stopp lösen, der Rest dieser Berührung
+        // (und eine eventuell folgende Trägheit) scrollt normal weiter.
+        lock = null;
+        return;
+      }
+      // Noch unentschieden, ob das ein bewusstes Weiterziehen wird - die
+      // Seite hält still, fühlt sich wie eine Wand an.
+      event.preventDefault();
+    }
+
+    function handleTouchEnd() {
+      touchStartY = null;
+    }
+
     function handleScroll() {
       const curr = window.scrollY;
 
@@ -215,6 +249,12 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
           if (!consumed[i] && lastY < points[i] && curr >= points[i]) {
             consumed[i] = true;
             lock = { y: points[i], engagedAt: performance.now() };
+            // Greift der Stopp mitten in einer laufenden Touch-Geste (der
+            // Finger ist noch unten), muss die Zieh-Referenz für
+            // handleTouchMove auf JETZT zurückgesetzt werden - sonst zählt
+            // die schon VOR dem Einrasten zurückgelegte Strecke sofort als
+            // "gelöst" und der Stopp wäre nie spürbar.
+            touchStartY = currentTouchY;
             // Sofort exakt auf den Punkt setzen - der Überschuss dieses
             // Scroll-Events wird nie gezeichnet.
             scrollToInstant(points[i]);
@@ -235,6 +275,10 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
     }
 
     window.addEventListener("wheel", handleWheel, { passive: false });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", handleTouchEnd, { passive: true });
     window.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
@@ -242,6 +286,10 @@ export function useJourneyScrollLock(cardIds: readonly string[], enabled: boolea
       if (navigatingIdleTimer) window.clearTimeout(navigatingIdleTimer);
       window.removeEventListener("resize", remeasure);
       window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
       window.removeEventListener("scroll", handleScroll);
       document.removeEventListener("click", handleClick);
       window.removeEventListener("pageshow", handlePageShow);
