@@ -1,0 +1,22 @@
+{
+  "appId": "com.fehlerfix.app",
+  "appName": "FehlerFix",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  },
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#FAFAF7",
+      "showSpinner": false
+    }
+  }
+}

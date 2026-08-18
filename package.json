@@ -5,10 +5,23 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "mobile:api": "node scripts/set-api-base.js",
+    "mobile:add:ios": "cap add ios",
+    "mobile:add:android": "cap add android",
+    "mobile:sync": "cap sync",
+    "mobile:open:ios": "cap open ios",
+    "mobile:open:android": "cap open android",
+    "mobile:build": "node scripts/set-api-base.js https://fehlerfix.onrender.com && cap sync"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/camera": "^8.2.2",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/supabase-js": "^2.110.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -18,5 +31,8 @@
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0"
   }
 }

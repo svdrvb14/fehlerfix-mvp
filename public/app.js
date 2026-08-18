@@ -254,7 +254,7 @@ const profileOptionsCache = {
 async function loadStates() {
   if (profileOptionsCache.states) return profileOptionsCache.states;
   try {
-    const res = await fetch('/api/profile/states');
+    const res = await apiFetch('/api/profile/states');
     const data = await res.json();
     profileOptionsCache.states = data.states || [];
   } catch (e) {
@@ -287,7 +287,7 @@ async function loadSchoolForms(stateCode) {
     return profileOptionsCache.schoolFormsByState[stateCode];
   }
   try {
-    const res = await fetch('/api/profile/school-forms?state=' + encodeURIComponent(stateCode));
+    const res = await apiFetch('/api/profile/school-forms?state=' + encodeURIComponent(stateCode));
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     profileOptionsCache.schoolFormsByState[stateCode] = data;
@@ -1029,9 +1029,8 @@ async function runAnalysis() {
     const controller = new AbortController();
     // Claude antwortet meist in 20-60s, großzügig timeout für Spitzenlasten
     const timer = setTimeout(() => controller.abort(), 600000); // 10 min
-    const res = await fetch('/api/analyze', {
+    const res = await apiFetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sessionId: SESSION_ID,
         images: small,
@@ -1146,9 +1145,8 @@ async function loadNextExercise() {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 300000); // 5 min
-    const res = await fetch('/api/next-exercise', {
+    const res = await apiFetch('/api/next-exercise', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: SESSION_ID }),
       signal: controller.signal,
     });
@@ -1430,9 +1428,8 @@ document.getElementById('btn-check').addEventListener('click', async () => {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 300000); // 5 min
-    const res = await fetch('/api/submit-exercise', {
+    const res = await apiFetch('/api/submit-exercise', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId: SESSION_ID, image: small }),
       signal: controller.signal,
     });
@@ -1579,13 +1576,67 @@ function escapeHtml(s) {
 
 const authState = { user: null, authEnabled: false };
 
-async function apiJson(url, opts) {
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+/* ─────────────────────────────────────────────────────────
+ * API-SCHICHT
+ * Eine zentrale Stelle für: Basis-URL, Anmelde-Token und Fehler.
+ * Wichtig für die native App (iOS/Android): dort liegt die Oberfläche lokal
+ * im App-Bundle, das Backend aber im Netz. Deshalb
+ *   - absolute URLs über FF_CONFIG.apiBase
+ *   - Anmeldung über Bearer-Token statt Cookie (Cookies sind in WebViews
+ *     unzuverlässig); im Web bleibt zusätzlich der httpOnly-Cookie aktiv.
+ * ───────────────────────────────────────────────────────── */
+
+const API_BASE = (window.FF_CONFIG && window.FF_CONFIG.apiBase) || '';
+const TOKEN_KEY = 'fehlerfix-token';
+
+// Token-Ablage. Im Web reicht localStorage; nativ nutzt Capacitor denselben
+// Speicher innerhalb der App-Sandbox (nicht von anderen Apps lesbar).
+const tokenStore = {
+  get: () => {
+    try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+  },
+  set: (t) => {
+    try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+  },
+};
+
+/** Baut die vollständige URL – relativ im Web, absolut in der nativen App. */
+function apiUrl(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return API_BASE + path;
+}
+
+/**
+ * Zentraler Fetch für alle API-Aufrufe.
+ * Setzt JSON-Header, hängt das Token an und wirft bei Fehlern eine Exception
+ * mit der Server-Meldung. Gibt die geparste Antwort zurück.
+ */
+async function apiFetch(path, opts = {}) {
+  const token = tokenStore.get();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: 'Bearer ' + token } : {}),
+    ...(opts.headers || {}),
+  };
+  return fetch(apiUrl(path), {
+    credentials: 'include', // Web: Cookie mitschicken
     ...opts,
+    headers,
   });
+}
+
+async function apiJson(path, opts) {
+  const res = await apiFetch(path, opts);
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Fehler (${res.status})`);
+  if (!res.ok) {
+    const err = new Error(data.error || `Fehler (${res.status})`);
+    err.status = res.status;
+    err.code = data.code;
+    err.body = data;
+    throw err;
+  }
+  // Nach Login/Registrierung liefert der Server ein Token – merken.
+  if (data.token) tokenStore.set(data.token);
   return data;
 }
 
@@ -1920,6 +1971,7 @@ function addDrawerItem(nav, label, onClick, danger) {
 
 async function logout() {
   try { await apiJson('/api/auth/logout', { method: 'POST' }); } catch (e) {}
+  tokenStore.set(null); // Token auch lokal verwerfen (native App hat keinen Cookie)
   authState.user = null;
   refreshNavForUser();
   closeDrawer();
@@ -2176,9 +2228,41 @@ function openUploadScreen() {
   showScreen('upload');
 }
 
-document.getElementById('btn-pick-camera').addEventListener('click', () => {
+/**
+ * Foto aufnehmen.
+ *   Nativ (iOS/Android): Capacitor-Kamera – echte native Kamera-Oberfläche
+ *     inkl. Berechtigungsdialog. Wird über das globale Capacitor-Objekt
+ *     angesprochen, das die native Hülle bereitstellt (kein Bundler nötig).
+ *   Web: Rückfall auf das Datei-Feld mit capture-Attribut.
+ */
+async function takePhoto() {
+  const CapCamera = window.Capacitor?.Plugins?.Camera;
+  if (window.FF_IS_NATIVE && CapCamera) {
+    try {
+      const photo = await CapCamera.getPhoto({
+        quality: 82,
+        allowEditing: false,
+        resultType: 'dataUrl',   // direkt als base64 – passt zu unserem Upload
+        source: 'CAMERA',
+        saveToGallery: false,
+      });
+      if (photo?.dataUrl) {
+        const small = await downscaleImage(photo.dataUrl, 1400, 0.8);
+        onboarding.uploadImages.push(small);
+        renderUploadPreview();
+      }
+      return;
+    } catch (e) {
+      // Nutzer hat abgebrochen oder Berechtigung fehlt → still beenden
+      console.warn('[camera] nativ nicht möglich:', e?.message || e);
+      return;
+    }
+  }
+  // Web-Rückfall
   document.getElementById('upload-camera-input').click();
-});
+}
+
+document.getElementById('btn-pick-camera').addEventListener('click', takePhoto);
 document.getElementById('btn-pick-files').addEventListener('click', () => {
   document.getElementById('upload-files-input').click();
 });
@@ -2266,9 +2350,8 @@ async function uploadAdditionalTexts() {
   try {
     // Der Endpoint nimmt ein Bild pro Aufruf → nacheinander senden
     for (const image of images) {
-      const res = await fetch('/api/upload-classtest', {
+      const res = await apiFetch('/api/upload-classtest', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image }),
       });
       if (!res.ok) {
@@ -2424,3 +2507,46 @@ document.getElementById('btn-progress-dash').addEventListener('click', backToDas
 // ─── Start: Auth prüfen und passenden Screen zeigen ───
 // (ganz am Ende, damit alle Event-Handler vorher registriert sind)
 initAuth();
+
+/* ═══════════════════════════════════════════════════════════
+ * NATIVE APP (iOS / Android via Capacitor)
+ * Läuft nur, wenn die App in der nativen Hülle steckt. Im Browser
+ * passiert hier nichts – window.Capacitor existiert dort nicht.
+ * ═══════════════════════════════════════════════════════════ */
+(function initNative() {
+  if (!window.FF_IS_NATIVE) return;
+  const P = window.Capacitor?.Plugins || {};
+
+  // Statusleiste: dunkle Symbole auf hellem Grund (unser Design ist hell)
+  try {
+    P.StatusBar?.setStyle({ style: 'LIGHT' });   // LIGHT = dunkle Schrift
+    P.StatusBar?.setBackgroundColor({ color: '#FFFFFF' }); // nur Android
+  } catch (e) {}
+
+  // Startbildschirm ausblenden, sobald die Oberfläche steht
+  try { P.SplashScreen?.hide(); } catch (e) {}
+
+  // Android: Hardware-Zurück-Taste soll innerhalb der App navigieren,
+  // nicht die App schließen. Reihenfolge: Modal → Menü → Screen-Hierarchie.
+  try {
+    P.App?.addListener?.('backButton', ({ canGoBack }) => {
+      const modal = document.getElementById('modal');
+      if (modal && !modal.hidden) { closeModal(); return; }
+
+      const drawer = document.getElementById('drawer');
+      if (drawer && !drawer.hidden) { closeDrawer(); return; }
+
+      const active = document.querySelector('.screen.active');
+      const id = active && active.id;
+
+      // Von Unterseiten zurück aufs Dashboard
+      if (['screen-my-profile', 'screen-leaderboard', 'screen-gamification',
+           'screen-upload', 'screen-exercise', 'screen-progress'].includes(id)) {
+        backToDashboard();
+        return;
+      }
+      // Auf dem Dashboard / Startbildschirm: App in den Hintergrund
+      P.App?.exitApp?.();
+    });
+  } catch (e) {}
+})();

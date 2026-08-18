@@ -78,7 +78,39 @@ const anthropic = process.env.ANTHROPIC_API_KEY
 
 app.use(express.json({ limit: '30mb' }));
 app.use(cookieParser());
-// Hängt req.student ODER req.teacher an, je nach Session-Cookie (sonst beide null)
+
+// ─────────────────────────────────────────────────────────────
+// CORS – nötig, weil die native App (iOS/Android) ihre Oberfläche lokal
+// ausliefert und die API damit von einem ANDEREN Origin aufruft.
+// Erlaubt sind nur die WebView-Origins von Capacitor plus optional
+// zusätzliche Origins aus EXTRA_CORS_ORIGINS (kommagetrennt).
+// ─────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = new Set([
+  'capacitor://localhost', // iOS
+  'ionic://localhost',     // ältere iOS-WebViews
+  'http://localhost',      // Android
+  'https://localhost',
+  'http://localhost:3000', // lokale Entwicklung
+  ...String(process.env.EXTRA_CORS_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+]);
+
+app.use((req, res, next) => {
+  const origin = req.get('origin');
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Vary', 'Origin');
+  }
+  if (req.method === 'OPTIONS') return res.sendStatus(204); // Preflight
+  next();
+});
+
+// Hängt req.student ODER req.teacher an (Cookie im Web, Bearer-Token nativ)
 app.use(auth.attachUser);
 
 // Request-Logging
@@ -211,8 +243,9 @@ app.post('/api/auth/login-email', requireDb, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     const student = await auth.loginEmail({ email, password });
-    auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ user: publicStudent(student) });
+    const token = auth.signToken(student);
+    auth.setSessionCookie(res, token);
+    res.json({ user: publicStudent(student), token });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -235,8 +268,9 @@ app.post('/api/auth/login-class', requireDb, async (req, res) => {
   try {
     const { classCode, displayName, pin } = req.body || {};
     const student = await auth.loginClassCode({ classCode, displayName, pin });
-    auth.setSessionCookie(res, auth.signToken(student));
-    res.json({ user: publicStudent(student) });
+    const token = auth.signToken(student);
+    auth.setSessionCookie(res, token);
+    res.json({ user: publicStudent(student), token });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
@@ -399,8 +433,9 @@ app.post('/api/teacher/login', requireDb, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     const teacher = await auth.loginTeacher({ email, password });
-    auth.setSessionCookie(res, auth.signToken(teacher, 'teacher'));
-    res.json({ user: publicTeacher(teacher) });
+    const token = auth.signToken(teacher, 'teacher');
+    auth.setSessionCookie(res, token);
+    res.json({ user: publicTeacher(teacher), token });
   } catch (e) {
     res.status(e.status || 500).json({ error: e.message });
   }
