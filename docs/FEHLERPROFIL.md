@@ -5,229 +5,272 @@ woher die Zahlen kommen – vor allem die Prozentwerte.
 
 ## Die wichtigste Einsicht vorweg
 
-**Die Prozentwerte werden nicht ausgerechnet, sondern von der KI vergeben.**
-
-Es gibt keine Formel wie „richtig ÷ gesamt". Stattdessen:
+**Die KI zählt. Der Code rechnet.**
 
 | Wer | Macht was |
 |---|---|
-| **Claude (KI)** | Vergibt die Prozentwerte – nach Regeln, die im Prompt stehen |
-| **Unser Code** | Prüft, begrenzt, verrechnet, sortiert und wählt daraus die nächste Übung |
+| **Claude (KI)** | Liefert Beobachtungen: „Kategorie X kam 6× vor, 4× davon falsch" |
+| **Unser Code** | Berechnet daraus den Lernstand – deterministisch, nachvollziehbar |
 
-Genau **eine** Zahl im System ist eine echte Formel: das `practice_weight`
-(siehe Phase 2). Alles andere ist KI-Einschätzung innerhalb enger Leitplanken.
+Die KI vergibt **keine** Prozentwerte mehr. Sie macht das, was ein Sprachmodell
+zuverlässig kann: Text lesen, Fehler erkennen, Kategorien zuordnen, zählen.
+Die Bewertung übernimmt ein Modell in `lib/mastery.js`.
+
+Warum das wichtig ist: Ein von der KI geschätzter Prozentwert ist eine Meinung –
+bei gleichem Input mal 25%, mal 40%, ohne dass man es prüfen könnte. Gezählte
+Vorkommen sind überprüfbare Fakten, und aus Fakten lässt sich reproduzierbar
+rechnen. Dieselben Zahlen ergeben immer denselben Lernstand.
 
 ## Die Datenstruktur
 
-Pro Schüler gibt es eine Liste („Feature-Table"). Jeder Eintrag:
+Pro Schüler eine Liste („Feature-Table"), ein Eintrag je Fehler-Kategorie:
 
 ```js
 {
-  name:    "ie/i-Schreibung",  // die Fehler-Kategorie
-  mastery: 25,                 // 0–100: wie sicher beherrscht der Schüler das?
-  right:   3,                  // wie oft seither richtig gemacht
-  wrong:   4                   // wie oft falsch gemacht
+  name:     "ie/i-Schreibung",
+  mastery:  39,                        // 0–100, der Balken im Dashboard
+  evidence: { correct: 2.4, total: 6 },// gewichtete Datengrundlage (intern)
+  right:    2,                         // Historie: insgesamt richtig
+  wrong:    4,                         // Historie: insgesamt falsch
+  observations: 6,                     // Gelegenheiten insgesamt
+  lastSeen: "2026-08-18"               // für die Vergessenskurve
 }
 ```
 
-`mastery` ist die Zahl, die im Dashboard als Balken erscheint.
-**Niedrig = großer Übungsbedarf.**
+`mastery` ist berechnet – niedrig heißt großer Übungsbedarf.
+`evidence` ist der eigentliche Zustand, aus dem gerechnet wird.
 
-Gespeichert in Supabase, Tabelle `student_state`, Spalte `feature_table`
-(als JSON). Code: `lib/store.js`.
+Gespeichert in Supabase, `student_state.feature_table` (JSON).
+
+---
+
+## Das Rechenmodell (`lib/mastery.js`)
+
+Der Lernstand ist eine **zeitgewichtete, rate-korrigierte Trefferquote**.
+Fünf Bestandteile:
+
+### 1. Rate-Korrektur
+
+Nicht jeder Treffer ist gleich viel wert. Bei „Komma ja/nein" trifft man mit
+Raten schon 50%, bei einem Diktatwort praktisch nie. Also wird der Rateanteil
+herausgerechnet:
+
+```
+können = (Trefferquote − Ratechance) / (1 − Ratechance)
+```
+
+| Aufgabentyp | Ratechance |
+|---|---|
+| Audio-Diktat | 0,05 |
+| Lückentext | 0,12 |
+| Fehlertext | 0,18 |
+| Zeichensetzung (überall) | 0,45 |
+
+Konkret: 2 von 4 Komma-Entscheidungen richtig ist praktisch Zufall und ergibt
+im Gleichgewicht ~14%. Dieselbe Quote im Diktat ergibt ~48%.
+
+### 2. Zeitgewichtung
+
+Bei jeder neuen Übung behält die alte Evidenz 80% ihres Gewichts
+(`RECENCY = 0.8`). Aktuelles zählt mehr, Historie verschwindet aber nicht.
+
+### 3. Glättung
+
+Laplace-Glättung mit neutralem Vorwissen (Gewicht 3, Wert 0,5). Verhindert,
+dass eine einzelne Beobachtung 0% oder 100% erzeugt.
+
+```
+mastery = (gewichteteTreffer + 1,5) / (gewichteteGelegenheiten + 3)
+```
+
+### 4. Schrittbegrenzung
+
+Eine einzelne Übung darf den Wert höchstens **15 Punkte** bewegen – wie der
+K-Faktor beim Elo-System. Ein Lernstand baut sich über mehrere Übungen auf.
+
+### 5. Vergessen
+
+Ohne Übung sinkt der Wert Richtung Boden (25%): erste Woche unverändert,
+danach Halbwertszeit 45 Tage.
+
+**Grenzen:** Der Wert bleibt immer zwischen 5% und 95% – intern, nicht nur in
+der Anzeige. Bei 100% würde das Modell jeden Fehler als Ausrutscher abtun und
+nicht mehr reagieren.
+
+### Was dabei herauskommt
+
+Wer dauerhaft eine bestimmte Quote trifft, landet ungefähr dort:
+
+| Trefferquote | Lernstand im Gleichgewicht |
+|---|---|
+| 0 von 4 | 7% |
+| 1 von 4 | 19% |
+| 2 von 4 | 44% |
+| 3 von 4 | 69% |
+| 4 von 4 | 93% |
+
+Nachprüfbar mit `npm test`.
 
 ---
 
 ## Phase 1 – Entstehung (`/api/analyze`)
 
-Beim Onboarding gehen die Bilder (abfotografierte Texte und/oder die drei
-handschriftlichen Texte) zusammen mit dem Kontext an Claude.
+Die Bilder gehen mit Kontext an Claude: Profil (Bundesland, Klasse, Schulform),
+Curriculum und FRESCH-Methodik.
 
-**Der Kontext**, den die KI mitbekommt (`buildContextBlock`):
-- Schüler-Profil: Bundesland, Klassenstufe, Schulform
-- Curriculum: bei Hessen die echten Lehrplan-Themen, sonst der Lehrplan-Name
-- FRESCH-Methodik: die vier Strategien
+**Die KI zählt** pro Kategorie zwei Zahlen:
 
-**Die Regeln für den Prozentwert** stehen wörtlich im Prompt
-(`server.js`, Funktion `detectFeaturesFromImages`):
-
-```
-4+ Fehler in der Kategorie  → mastery 15–25
-2–3 Fehler                  → mastery 25–40
-1 Fehler                    → mastery 40–55
-kein Fehler, aber typisch
-für die Klassenstufe        → mastery 70–85
+```json
+{ "name": "ie/i-Schreibung", "occurrences": 6, "errors": 4 }
 ```
 
-Die letzte Zeile ist wichtig: Auch ohne gefundene Fehler bekommt der Schüler
-Kategorien – sonst gäbe es nichts zu üben.
+- `occurrences` – wie oft im Text die **Gelegenheit** bestand, die Regel
+  anzuwenden (richtig *und* falsch)
+- `errors` – wie viele davon falsch waren
 
-**Was der Code danach macht:**
+Zusätzlich 1–2 lehrplanrelevante Kategorien, die fehlerfrei waren
+(`errors: 0`) – sonst gäbe es nichts zu üben, wenn ein Kind kaum Fehler macht.
 
-```js
-mastery: clamp(f.initialMastery, 0, 100)   // hart auf 0–100 begrenzen
-wrong:   clamp(f.wrong || 1, 1, 99)        // mindestens 1
-right:   0                                 // noch nichts richtig gemacht
-```
+**Der Code rechnet** daraus (`initialFromCounts`) die geglättete Trefferquote:
 
-Dann: nach `mastery` aufsteigend sortieren – die größte Schwäche steht oben.
-Liefert die KI gar nichts, greift ein Notfall-Profil
-(Groß-/Kleinschreibung 60, das/dass 65, Kommasetzung 55).
+| Beobachtung | Startwert |
+|---|---|
+| 6× vorgekommen, 4 Fehler | 39% |
+| 6× vorgekommen, 2 Fehler | 61% |
+| 6× vorgekommen, 0 Fehler | 83% |
+| 3× vorgekommen, 3 Fehler | 25% |
+| kam nicht vor | 60% (neutral) |
+
+Danach aufsteigend sortiert – größte Schwäche oben.
 
 ---
 
 ## Phase 2 – Welche Übung kommt als nächste? (`/api/next-exercise`)
 
-Hier rechnet der Code, nicht die KI:
+Reine Rechnung, keine KI:
 
 ```js
-practice_weight = max(1, 100 - mastery)
+practice_weight = max(1, 100 − mastery)
 ```
 
-Also: **mastery 20 → Gewicht 80** (dringend üben),
-**mastery 90 → Gewicht 10** (läuft schon).
-Das `max(1, …)` sorgt dafür, dass selbst ein perfektes Thema nie ganz
-verschwindet.
+mastery 39 → Gewicht 61 (dringend). mastery 93 → Gewicht 7.
+Das `max(1, …)` sorgt dafür, dass kein Thema ganz verschwindet.
 
-**Die Auswahl des Themas** (`server.js`, `/api/next-exercise`):
+**Themenwahl:**
 
 ```js
-if (exercisesCompleted < 3)          → Thema mit dem höchsten Gewicht
-else if (letzte Übung war "poor")    → beim selben Thema bleiben
-else                                 → wieder das Thema mit dem höchsten Gewicht
+if (Übungen < 3)                     → höchstes Gewicht
+else if (letzte Übung war "poor")    → beim Thema bleiben und vertiefen
+else                                 → höchstes Gewicht
 ```
 
-Die ersten drei Übungen bleiben also bewusst bei der größten Schwäche.
-Danach: Bei schlechtem Ergebnis wird nicht gewechselt, sondern vertieft.
-
-Der Übungs**typ** rotiert stur der Reihe nach – Lückentext, Fehlertext,
-Audio-Diktat – damit alle drei vorkommen.
+Der Aufgaben**typ** rotiert fest: Lückentext → Fehlertext → Audio-Diktat.
 
 ---
 
 ## Phase 3 – Update nach der Übung (`/api/submit-exercise`)
 
-Das Foto der handschriftlichen Lösung geht an Claude, zusammen mit der
-erwarteten Lösung und der aktuellen Feature-Table. Die KI liefert zurück:
+Das Foto der Lösung geht an Claude, zusammen mit der erwarteten Lösung und der
+aktuellen Feature-Table. **Die KI zählt wieder:**
 
 ```json
 {
   "overall_score": 70,
   "results": [
-    { "feature": "ie/i-Schreibung", "right": 3, "wrong": 1, "new_mastery": 45 }
-  ],
-  "new_features_detected": [ … ],
-  "word_corrections": [ … ]
+    { "feature": "ie/i-Schreibung", "total": 4, "correct": 3 }
+  ]
 }
 ```
 
-**Die Regel für die neue mastery** steht wieder im Prompt:
+**Der Code verrechnet** (`applyGradingResults`):
 
-```
-alles richtig    → +15 bis +25 Punkte
-viele Fehler     → −15 bis −25 Punkte
-teilweise        → moderat anpassen
-```
+1. Vergessen anrechnen (Tage seit `lastSeen`)
+2. Ratechance aus Aufgabentyp + Kategorie bestimmen
+3. Beobachtung durch das Modell schicken (`mastery.observe`)
+4. `right` / `wrong` / `observations` als Historie fortschreiben
+5. `lastSeen` aktualisieren
 
-**Was der Code damit macht** (`applyGradingResults`):
+### Neue Schwächen
 
-```js
-match.right  += clamp(r.right, 0, 99)     // aufaddieren
-match.wrong  += clamp(r.wrong, 0, 99)     // aufaddieren
-match.mastery = clamp(r.new_mastery, 0, 100)  // ERSETZEN, nicht addieren
-```
-
-Wichtig: `right` und `wrong` wachsen als Historie an, `mastery` wird jedes Mal
-komplett neu gesetzt.
-
-Zuordnung der Kategorie: erst exakter Namensvergleich, sonst Teilwort-Treffer –
-weil die KI Namen leicht unterschiedlich schreibt.
-
-### Neue Schwächen entdecken
-
-Die KI darf Kategorien vorschlagen, die noch nicht in der Tabelle stehen
-(`addNewFeatures`):
-
-```js
-wrong   = clamp(nf.wrong || 1, 1, 99)
-mastery = nf.initial_mastery ?? (wrong >= 2 ? 30 : 40)
-```
-
-Vorher der Duplikat-Schutz `similarFeatureExists`: Ein Vorschlag wird
-verworfen, wenn ein bestehender Name ihn enthält oder umgekehrt – damit nicht
-„ie/i" und „ie/i-Schreibung" nebeneinander stehen.
+Die KI darf Kategorien vorschlagen, die noch nicht in der Tabelle stehen –
+ebenfalls mit `total` und `correct`. `similarFeatureExists` verhindert
+Duplikate („ie/i" vs. „ie/i-Schreibung").
 
 ### Wenn die KI ausfällt
 
-Kein Grading (Netzfehler, kaputtes JSON) → `ratio = 0.5`, es gibt Punkte, aber
-**die mastery-Werte bleiben unverändert**. Lieber kein Update als ein falsches.
+Kein Grading (Netzfehler, kaputtes JSON) → `ratio = 0.5` für die Punkte, aber
+**der Lernstand bleibt unverändert**. Lieber kein Update als ein falsches.
 
 ---
 
-## Was daraus Punkte und Level macht
+## Punkte, Level, Streak
 
 ```js
 ratio  = overall_score / 100
-points = round(ratio * 10)              // max. 10 Punkte pro Übung
-level  = floor(gesamtpunkte / 100) + 1  // alle 100 Punkte ein Level
-performance = ratio >= 0.8 ? "good"
-            : ratio >= 0.5 ? "medium"
-            : "poor"                    // steuert Phase 2
+points = round(ratio * 10)              // max. 10 pro Übung
+level  = floor(gesamtpunkte / 100) + 1
+performance = ratio >= 0.8 ? "good" : ratio >= 0.5 ? "medium" : "poor"
 ```
 
----
-
-## Beispiel: ein kompletter Durchlauf
-
-**Onboarding.** Claude findet 4× „ie/i" und 2× „ss/ß":
-
-| Kategorie | mastery | right | wrong | Gewicht |
-|---|---|---|---|---|
-| ie/i-Schreibung | 20 | 0 | 4 | **80** |
-| ss/ß | 32 | 0 | 2 | 68 |
-
-**Übung 1** → höchstes Gewicht → „ie/i-Schreibung".
-Schüler macht 3 von 4 richtig, Claude gibt `overall_score: 75`,
-`new_mastery: 42`:
-
-| Kategorie | mastery | right | wrong | Gewicht |
-|---|---|---|---|---|
-| ss/ß | 32 | 0 | 2 | **68** |
-| ie/i-Schreibung | 42 | 3 | 1 | 58 |
-
-Punkte: `round(0.75 × 10)` = **8**. Performance „medium".
-
-**Übung 2** – aber: Übung < 3, deshalb weiter „ie/i", nicht „ss/ß".
-Ab Übung 4 würde nach Gewicht gewählt, also „ss/ß".
+`performance` steuert Phase 2. Streak: `bumpStreak` in `lib/store.js`,
+Tagesgrenze in Europa/Berlin.
 
 ---
 
-## Grenzen (wichtig zu wissen)
+## Beispiel: ein Durchlauf
 
-1. **Nicht deterministisch.** Dieselben Bilder können leicht andere Werte
-   ergeben – es ist eine KI-Einschätzung, keine Messung. Die Prompt-Regeln
-   halten die Streuung klein, beseitigen sie aber nicht.
+**Onboarding.** Claude zählt: „ie/i" 6× vorgekommen, 4 Fehler; „ss/ß" 5×, 2 Fehler.
 
-2. **Abhängig von der Lesbarkeit.** Was die KI nicht entziffert, kann sie nicht
-   bewerten.
+| Kategorie | mastery | Grundlage | Gewicht |
+|---|---|---|---|
+| ie/i-Schreibung | 39% | 2 von 6 | **61** |
+| ss/ß | 56% | 3 von 5 | 44 |
 
-3. **Kalibrierung liegt im Prompt.** Wenn die Werte zu streng oder zu milde
-   wirken, ändert man die Zahlen in den Prompt-Regeln – nicht den Code.
+**Übung 1** → höchstes Gewicht → „ie/i", Typ Lückentext (Ratechance 0,12).
+Claude zählt: 4 Gelegenheiten, 3 richtig.
 
-4. **Die Sortierung ist die eigentliche Intelligenz.** Selbst wenn ein
-   einzelner Prozentwert um ±10 danebenliegt, stimmt die *Reihenfolge*
-   meistens – und die entscheidet, was geübt wird.
+Modell: Quote 0,75 → rate-korrigiert 0,716 → neue Evidenz → **47%**
+(Sprung auf +8 Punkte, unter der 15-Punkte-Grenze).
+
+| Kategorie | mastery | Gewicht |
+|---|---|---|
+| ie/i-Schreibung | 47% | **53** |
+| ss/ß | 56% | 44 |
+
+Punkte: `round(0.75 × 10)` = **8**.
+„ie/i" bleibt vorne – ab Übung 4 würde nach Gewicht gewechselt.
+
+---
+
+## Was das Modell nicht kann
+
+1. **Es hängt an den Zählungen der KI.** Zählt Claude die Gelegenheiten
+   falsch, rechnet das Modell sauber mit falschen Zahlen. Das ist aber ein
+   deutlich kleineres und besser prüfbares Risiko als eine frei geschätzte
+   Prozentzahl – Zählungen kann man im Log gegenlesen.
+
+2. **Es braucht Daten.** Ein Wert aus 3 Gelegenheiten ist grob. Deshalb steht
+   die Zahl der Gelegenheiten in beiden Ansichten mit dabei.
+
+3. **Kalibrierung ist eine Entscheidung.** `RECENCY`, `MAX_STEP_PER_EXERCISE`,
+   die Ratechancen und die Vergessenskurve sind gesetzte Werte. Sie stehen alle
+   oben in `lib/mastery.js` – geändert wird dort, nicht im Prompt. `npm test`
+   zeigt sofort, ob das Modell danach noch sinnvoll rechnet.
+
+---
 
 ## Wo im Code was steht
 
 | Was | Datei | Funktion |
 |---|---|---|
+| **Rechenmodell** | `lib/mastery.js` | `observe`, `initialFromCounts`, `applyDecay` |
+| Prüfungen dazu | `test/mastery.test.js` | `npm test` |
 | Profil-Entstehung | `server.js` | `detectFeaturesFromImages` |
-| Nachträgliche Texte einmischen | `server.js` | `mergeDetectedFeatures` |
-| Gewichtung | `server.js` | `weightedFeatures` |
-| Themen-/Typ-Wahl | `server.js` | Route `/api/next-exercise` |
 | Update nach Übung | `server.js` | `applyGradingResults` |
 | Neue Kategorien | `server.js` | `addNewFeatures`, `similarFeatureExists` |
+| Nachträgliche Texte | `server.js` | `mergeDetectedFeatures` |
+| Gewichtung | `server.js` | `weightedFeatures` |
+| Themen-/Typwahl | `server.js` | Route `/api/next-exercise` |
 | Laden/Speichern | `lib/store.js` | `loadStudentState`, `saveStudentState` |
 | Curriculum-Kontext | `lib/curriculum.js` | `curriculumPromptBlock` |
 | FRESCH-Methodik | `lib/methods/fresch.js` | `freschMethodPromptBlock` |

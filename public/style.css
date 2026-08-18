@@ -2164,3 +2164,14 @@ body {
     padding-right: calc(16px + env(safe-area-inset-right));
   }
 }
+
+/* Datengrundlage unter den Fehlerprofil-Balken */
+.feature-bar-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.feature-bar-note em {
+  font-style: normal;
+  color: var(--coral);
+}

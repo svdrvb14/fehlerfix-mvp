@@ -2083,9 +2083,15 @@ async function showStudentDetail(studentId, cls) {
     const bars = (student.errorProfile || []).map((f) => {
       const m = Math.round(f.mastery ?? 0);
       const color = m < 40 ? 'var(--coral)' : m < 70 ? '#e0a83d' : '#6dbe7a';
+      // Datengrundlage transparent machen: richtig/falsch und Zahl der Gelegenheiten
+      const obs = f.observations || 0;
+      const right = f.right || 0;
+      const wrong = f.wrong || 0;
+      const weak = obs < 4 ? ' <em>(noch wenig Daten)</em>' : '';
       return `<div class="feature-bar-row">
         <div class="feature-bar-label"><span>${escapeHtml(f.name)}</span><span>${m}%</span></div>
         <div class="feature-bar-track"><div class="feature-bar-fill" style="width:${m}%;background:${color}"></div></div>
+        <div class="feature-bar-note">${right} richtig · ${wrong} falsch · ${obs} Gelegenheiten${weak}</div>
       </div>`;
     }).join('') || '<div class="dash-empty">Noch keine Analyse – Schüler/in hat noch nicht geübt.</div>';
 
@@ -2399,9 +2405,18 @@ async function showMyProfile() {
       const m = Math.round(f.mastery ?? 0);
       const color = m < 40 ? 'var(--coral)' : m < 70 ? '#e0a83d' : '#6dbe7a';
       const label = m < 40 ? 'Üben wir noch' : m < 70 ? 'Wird schon besser' : 'Sitzt gut';
+      // Wie viele Gelegenheiten stecken hinter dem Wert? Bei wenigen ist er noch grob.
+      const obs = f.observations || 0;
+      const note = obs < 4
+        ? ` · noch wenige Beispiele (${obs})`
+        : ` · aus ${obs} Beispielen`;
       return `<div class="feature-bar-row">
-        <div class="feature-bar-label"><span>${escapeHtml(f.name)}</span><span>${label} · ${m}%</span></div>
+        <div class="feature-bar-label">
+          <span>${escapeHtml(f.name)}</span>
+          <span>${label} · ${m}%</span>
+        </div>
         <div class="feature-bar-track"><div class="feature-bar-fill" style="width:${m}%;background:${color}"></div></div>
+        <div class="feature-bar-note">${note.replace(/^ · /, '')}</div>
       </div>`;
     }).join('') || '<div class="dash-empty">Noch keine Daten – mach erst ein paar Übungen.</div>';
 

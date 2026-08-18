@@ -42,6 +42,7 @@ const {
   isValidProfile,
 } = require('./lib/curriculum');
 const { freschMethodPromptBlock } = require('./lib/methods/fresch');
+const mastery = require('./lib/mastery');
 
 // Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
 const { isDbEnabled } = require('./lib/db');
@@ -717,22 +718,40 @@ function addNewFeatures(table, newFeatures) {
       console.log(`[memory] Neues Feature übersprungen (Duplikat): "${name}"`);
       continue;
     }
-    const wrongCount = clamp(nf.wrong || nf.count || 1, 1, 99);
-    const initialMastery = clamp(
-      nf.initial_mastery != null ? nf.initial_mastery : wrongCount >= 2 ? 30 : 40,
-      0,
-      100
-    );
-    const feat = { name, mastery: initialMastery, right: 0, wrong: wrongCount };
+    // Auch hier: die KI zählt, wir rechnen.
+    const total = Math.max(1, clamp(nf.total ?? nf.wrong ?? 1, 1, 99));
+    const correct = Math.min(total, Math.max(0, clamp(nf.correct ?? 0, 0, 99)));
+    const errors = total - correct;
+    const init = mastery.initialFromCounts({ occurrences: total, errors });
+    const feat = {
+      name,
+      mastery: mastery.toPercent(init.mastery),
+      evidence: init.evidence,
+      right: correct,
+      wrong: errors,
+      observations: total,
+      lastSeen: new Date().toISOString().slice(0, 10),
+    };
     table.push(feat);
     added.push({ ...feat, reason: nf.reason || '', evidence: nf.evidence || '' });
   }
   return added;
 }
 
-function applyGradingResults(table, results) {
+/**
+ * Verrechnet die ZÄHLUNGEN der KI mit dem bestehenden Lernstand.
+ * Der Prozentwert kommt aus lib/mastery.js – nicht von der KI.
+ *
+ * @param {Array}  table        Feature-Table des Schülers
+ * @param {Array}  results      [{ feature, total, correct }]
+ * @param {string} exerciseType bestimmt die Rate-Wahrscheinlichkeit
+ */
+function applyGradingResults(table, results, exerciseType) {
   for (const r of results || []) {
     if (!r || !r.feature) continue;
+
+    // Kategorie zuordnen (exakt, sonst über Teilwort – die KI schreibt Namen
+    // gelegentlich leicht anders)
     const targetName = norm(r.feature);
     let match = table.find((f) => norm(f.name) === targetName);
     if (!match) {
@@ -743,14 +762,50 @@ function applyGradingResults(table, results) {
           targetName.includes(norm(f.name).split(' ')[0])
       );
     }
-    if (match) {
-      match.right = (match.right || 0) + clamp(r.right, 0, 99);
-      match.wrong = (match.wrong || 0) + clamp(r.wrong, 0, 99);
-      if (r.new_mastery != null && Number.isFinite(Number(r.new_mastery))) {
-        match.mastery = clamp(r.new_mastery, 0, 100);
-      }
-    }
+    if (!match) continue;
+
+    // Zählungen plausibilisieren
+    const total = clamp(r.total, 0, 99);
+    if (total <= 0) continue;
+    const correct = Math.min(total, clamp(r.correct, 0, 99));
+
+    ensureEvidence(match);
+
+    // Vergessen anrechnen, bevor neue Evidenz dazukommt
+    const days = daysSince(match.lastSeen);
+    let current = mastery.applyDecay(match.mastery / 100, days);
+    match.evidence = mastery.evidenceFor(current, match.evidence.total);
+
+    // Neue Beobachtung verrechnen
+    const guess = mastery.guessRateFor(exerciseType, match.name);
+    const out = mastery.observe(match.evidence, { correct, total }, guess);
+
+    match.evidence = out.evidence;
+    match.mastery = mastery.toPercent(out.mastery);
+    match.right = (match.right || 0) + correct;
+    match.wrong = (match.wrong || 0) + (total - correct);
+    match.observations = (match.observations || 0) + total;
+    match.lastSeen = new Date().toISOString().slice(0, 10);
   }
+}
+
+/** Tage seit einem ISO-Datum (YYYY-MM-DD); 0 wenn unbekannt. */
+function daysSince(isoDate) {
+  if (!isoDate) return 0;
+  const then = Date.parse(isoDate);
+  if (!Number.isFinite(then)) return 0;
+  return Math.max(0, (Date.now() - then) / 86400000);
+}
+
+/**
+ * Ältere Profile (vor Einführung des Modells) haben nur mastery, keine Evidenz.
+ * Wir leiten sie einmalig aus dem vorhandenen Wert ab, damit nichts verloren geht.
+ */
+function ensureEvidence(feature) {
+  if (feature.evidence && Number.isFinite(feature.evidence.total)) return;
+  const known = (feature.right || 0) + (feature.wrong || 0);
+  feature.observations = feature.observations || known;
+  feature.evidence = mastery.evidenceFor((feature.mastery ?? 50) / 100, known);
 }
 
 function parseJsonResponse(rawText) {
@@ -892,11 +947,20 @@ async function detectFeaturesFromImages(session, images, introText) {
         'Beispiele für Feature-Namen: "ie/i-Schreibung", "ss/ß", "Groß-/Kleinschreibung von Nomen", ' +
         '"Doppelkonsonanten", "Dehnungs-h", "das/dass", "Kommasetzung bei Aufzählungen", ' +
         '"Zusammen-/Getrenntschreibung", "seid/seit", "wider/wieder", "Endung -ig/-lich".\n\n' +
+        'DEINE AUFGABE IST ZÄHLEN, NICHT BEWERTEN.\n' +
+        'Gib für jede Kategorie zwei Zahlen an:\n' +
+        '  occurrences = wie oft im Text eine GELEGENHEIT bestand, diese Regel anzuwenden\n' +
+        '                (also alle Stellen, an denen die Regel greift – richtig UND falsch)\n' +
+        '  errors      = wie viele davon FALSCH geschrieben wurden\n' +
+        'Es gilt immer: errors <= occurrences.\n' +
+        'Beispiel: Der Text enthält 5 Wörter mit langem i; 3 davon falsch geschrieben\n' +
+        '  → { "name": "ie/i-Schreibung", "occurrences": 5, "errors": 3 }\n\n' +
         'Antworte AUSSCHLIESSLICH mit JSON in genau diesem Format:\n' +
-        '{ "featureTable": [ { "name": "ie/i-Schreibung", "wrong": 4, "initialMastery": 25, ' +
-        '"examples": ["Tier→Tir"] } ], "totalErrors": 6, "readSuccessfully": true }\n\n' +
-        'Regeln für initialMastery: 4+ Fehler → 15-25, 2-3 → 25-40, 1 → 40-55, ' +
-        'kein Fehler aber typisch für Stufe → 70-85. Sortiere niedrigste mastery zuerst.',
+        '{ "featureTable": [ { "name": "ie/i-Schreibung", "occurrences": 5, "errors": 3, ' +
+        '"examples": ["Tier→Tir"] } ], "readSuccessfully": true }\n\n' +
+        'Nimm zusätzlich 1-2 Kategorien auf, die für die Klassenstufe wichtig sind, aber im\n' +
+        'Text fehlerfrei waren – mit occurrences = Anzahl der Gelegenheiten und errors = 0.\n' +
+        'Den Lernstand in Prozent berechnet unser System selbst – schätze ihn NICHT.',
     },
   ];
   const lang = getLanguage(session.profile?.language);
@@ -913,13 +977,25 @@ async function detectFeaturesFromImages(session, images, introText) {
   const parsed = parseJsonResponse(text); // wirft bei Parse-Fehler
   const rawTable = Array.isArray(parsed.featureTable) ? parsed.featureTable : [];
   return rawTable
-    .map((f) => ({
-      name: String(f.name || '').trim(),
-      mastery: clamp(f.initialMastery != null ? f.initialMastery : f.mastery, 0, 100),
-      right: 0,
-      wrong: clamp(f.wrong || 1, 1, 99),
-    }))
-    .filter((f) => f.name);
+    .map((f) => {
+      const name = String(f.name || '').trim();
+      if (!name) return null;
+      // Zählungen der KI plausibilisieren, dann RECHNEN wir den Startwert.
+      const errors = Math.max(0, Math.round(Number(f.errors) || 0));
+      // Fallback: ältere Antwortform ohne occurrences → Fehler als Gelegenheiten annehmen
+      const occurrences = Math.max(errors, Math.round(Number(f.occurrences) || errors || 1));
+      const init = mastery.initialFromCounts({ occurrences, errors });
+      return {
+        name,
+        mastery: mastery.toPercent(init.mastery),
+        evidence: init.evidence,          // gewichtete Evidenz (Grundlage der Berechnung)
+        right: occurrences - errors,
+        wrong: errors,
+        observations: occurrences,        // wie viele Gelegenheiten insgesamt beobachtet
+        lastSeen: new Date().toISOString().slice(0, 10),
+      };
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -931,11 +1007,24 @@ function mergeDetectedFeatures(table, detected) {
   for (const d of detected) {
     const match = table.find((f) => norm(f.name) === norm(d.name));
     if (match) {
-      match.wrong = (match.wrong || 0) + (d.wrong || 1);
-      // Mastery Richtung erkanntem Wert ziehen (aber nicht komplett überschreiben)
-      match.mastery = clamp(Math.round((match.mastery + d.mastery) / 2), 0, 100);
+      // Bekannte Kategorie: die neuen Zählungen als weitere Beobachtung verrechnen.
+      // Hochgeladene Texte sind freie Produktion → praktisch keine Ratechance.
+      ensureEvidence(match);
+      const total = Math.max(1, d.observations || (d.right + d.wrong) || 1);
+      const correct = Math.max(0, Math.min(total, d.right ?? 0));
+      const out = mastery.observe(
+        match.evidence,
+        { correct, total },
+        mastery.GUESS_BY_TYPE.audio_dictation
+      );
+      match.evidence = out.evidence;
+      match.mastery = mastery.toPercent(out.mastery);
+      match.right = (match.right || 0) + correct;
+      match.wrong = (match.wrong || 0) + (total - correct);
+      match.observations = (match.observations || 0) + total;
+      match.lastSeen = new Date().toISOString().slice(0, 10);
     } else {
-      table.push({ name: d.name, mastery: d.mastery, right: 0, wrong: d.wrong || 1 });
+      table.push(d);
     }
   }
   table.sort((a, b) => a.mastery - b.mastery);
@@ -961,76 +1050,14 @@ app.post('/api/analyze', async (req, res) => {
   console.log(`[analyze] Profil: ${JSON.stringify(session.profile)}`);
   console.log(`[analyze] Bilder empfangen: ${sizesKb.join('kb, ')}kb. Schicke an Claude (${MODEL})...`);
 
-  // Anthropic-Konvention: Bilder zuerst, dann Text-Anweisung
-  const userContent = [
-    ...images.map(toImageBlock),
-    {
-      type: 'text',
-      text:
-        buildContextBlock(session.profile) + '\n' +
-        'Auf den Bildern siehst du drei handgeschriebene Texte einer Schülerin / eines Schülers.\n' +
-        'Lies die Handschrift sorgfältig. Identifiziere ALLE Rechtschreib-/Grammatik-Fehler ' +
-        'und ordne sie spezifischen, trainierbaren KATEGORIEN (Features) zu.\n\n' +
-        'Beispiele für Feature-Namen: "ie/i-Schreibung", "ss/ß", "Groß-/Kleinschreibung von Nomen", ' +
-        '"Doppelkonsonanten", "Dehnungs-h", "das/dass", "Kommasetzung bei Aufzählungen", ' +
-        '"Zusammen-/Getrenntschreibung", "seid/seit", "wider/wieder", "Endung -ig/-lich".\n\n' +
-        'Antworte AUSSCHLIESSLICH mit JSON in genau diesem Format:\n' +
-        '{\n' +
-        '  "featureTable": [\n' +
-        '    {\n' +
-        '      "name": "ie/i-Schreibung",\n' +
-        '      "wrong": 4,                    // wie oft kam dieser Fehler vor\n' +
-        '      "initialMastery": 25,          // 0-100: niedriger = mehr Übungsbedarf\n' +
-        '      "examples": ["Tier→Tir", "Bieber→Biber"]\n' +
-        '    }\n' +
-        '  ],\n' +
-        '  "totalErrors": 6,\n' +
-        '  "readSuccessfully": true\n' +
-        '}\n\n' +
-        'Regeln für initialMastery:\n' +
-        '- 4+ Fehler in der Kategorie → mastery 15-25\n' +
-        '- 2-3 Fehler → mastery 25-40\n' +
-        '- 1 Fehler → mastery 40-55\n' +
-        '- kein Fehler aber typisch für Klassenstufe → mastery 70-85\n\n' +
-        'Sortiere die featureTable nach Übungsbedarf (niedrigste mastery zuerst). ' +
-        'Wenn das Kind quasi keine Fehler macht, gib trotzdem 2-3 für die Klassenstufe ' +
-        'typische Kategorien zurück (mastery 70-85).',
-    },
-  ];
-
   try {
-    const lang = getLanguage(session.profile?.language);
-    const { text } = await callClaude({
-      label: 'analyze',
-      systemPrompt:
-        lang.teacherRole +
-        ' Du analysierst Handschrift-Bilder und baust ein strukturiertes Fehlerprofil. ' +
-        'Du passt deine Erwartungen an die angegebene Klassenstufe an. ' +
-        'Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
-      userContent,
-      maxTokens: 4000,
-    });
-
-    let parsed;
-    try {
-      parsed = parseJsonResponse(text);
-    } catch (e) {
-      console.error('[analyze] JSON-Parse-Fehler. Roh-Antwort:\n' + text);
-      return res.status(502).json({
-        error: 'KI-Antwort konnte nicht verarbeitet werden.',
-        debug: { rawPreview: text.slice(0, 300) },
-      });
-    }
-
-    const rawTable = Array.isArray(parsed.featureTable) ? parsed.featureTable : [];
-    const table = rawTable
-      .map((f) => ({
-        name: String(f.name || '').trim(),
-        mastery: clamp(f.initialMastery != null ? f.initialMastery : f.mastery, 0, 100),
-        right: 0,
-        wrong: clamp(f.wrong || 1, 1, 99),
-      }))
-      .filter((f) => f.name);
+    // Gemeinsame Analyse-Funktion nutzen (ein Prompt, eine Umwandlung –
+    // vorher stand hier eine zweite, veraltete Kopie).
+    const table = await detectFeaturesFromImages(
+      session,
+      images,
+      'Auf den Bildern siehst du handgeschriebene Texte einer Schülerin / eines Schülers.'
+    );
 
     if (table.length === 0) {
       console.warn('[analyze] Leere Feature-Table von KI – setze Defaults.');
@@ -1301,8 +1328,9 @@ app.post('/api/submit-exercise', async (req, res) => {
     'AUFGABE:\n' +
     '1) Lies die Handschrift sorgfältig (bestes Bemühen, auch wenn unsauber).\n' +
     '2) Vergleiche mit der erwarteten Lösung.\n' +
-    '3) Bewerte das FOKUS-Feature: wie oft korrekt/falsch. Schlage neue mastery (0-100) vor.\n' +
-    '4) Bewerte ANDERE bekannte Features, falls beobachtbar.\n' +
+    '3) ZÄHLE für das Fokus-Feature: wie viele GELEGENHEITEN gab es in dieser Übung\n' +
+    '   (alle Stellen, an denen die Regel greift) und wie viele davon waren KORREKT?\n' +
+    '4) Zähle genauso für ANDERE bekannte Features, falls in der Lösung beobachtbar.\n' +
     '5) Erkenne NEUE Fehlermuster (spezifisch, trainierbar, keine vagen Stil-Probleme).\n' +
     '6) Liste JEDES FALSCH GESCHRIEBENE WORT einzeln als word_corrections (siehe unten).\n' +
     '7) Gib einen overall_score 0-100 für diese Übung.\n\n' +
@@ -1313,8 +1341,10 @@ app.post('/api/submit-exercise', async (req, res) => {
     'Beispiel-Erklärung (Verlängern): „Verlängere das Wort: Berg → die Berge. Du hörst das g am Ende, ' +
     'also schreibst du Berg mit g, nicht mit k." KEINE generischen Tipps. ' +
     'Wenn alles richtig war: leere Liste.\n\n' +
-    'WICHTIG mastery: Bei hoher Korrektheit (alles richtig) +15-25 Punkte, bei vielen Fehlern -15-25 Punkte. ' +
-    'Bei teilweisem Erfolg moderat.\n\n' +
+    'WICHTIG: Schätze KEINE Prozentwerte und keinen Lernstand. Wir brauchen nur deine\n' +
+    'Zählungen (total = Gelegenheiten, correct = davon richtig). Den Lernstand berechnet\n' +
+    'unser System daraus selbst – so bleibt er nachvollziehbar und vergleichbar.\n' +
+    'Es gilt immer: correct <= total.\n\n' +
     'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
     '{\n' +
     '  "overall_score": 0-100,\n' +
@@ -1327,10 +1357,10 @@ app.post('/api/submit-exercise', async (req, res) => {
     '"feature": "<Feature-Name aus Memory oder neu>" }\n' +
     '  ],\n' +
     '  "results": [\n' +
-    '    { "feature":"<exakter Name aus Memory>", "right":N, "wrong":N, "feedback":"...", "new_mastery":0-100 }\n' +
+    '    { "feature":"<exakter Name aus Memory>", "total":N, "correct":N, "feedback":"..." }\n' +
     '  ],\n' +
     '  "new_features_detected": [\n' +
-    '    { "name":"...", "reason":"...", "evidence":"...", "wrong":N, "initial_mastery":0-100 }\n' +
+    '    { "name":"...", "reason":"...", "evidence":"...", "total":N, "correct":N }\n' +
     '  ]\n' +
     '}';
 
@@ -1366,7 +1396,7 @@ app.post('/api/submit-exercise', async (req, res) => {
   let ratio = 0.5; // Fallback, falls KI versagt
 
   if (aiGrading) {
-    applyGradingResults(session.featureTable, aiGrading.results);
+    applyGradingResults(session.featureTable, aiGrading.results, last.type);
     addedFeatures = addNewFeatures(session.featureTable, aiGrading.new_features_detected);
     session.featureTable.sort((a, b) => a.mastery - b.mastery);
 
