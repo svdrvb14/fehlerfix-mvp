@@ -1157,6 +1157,11 @@ async function loadNextExercise() {
       throw new Error(body.error || `Server-Fehler (HTTP ${res.status})`);
     }
     const exercise = await res.json();
+    // Karten-Formate haben eine eigene Oberfläche (Karte für Karte + Wischen)
+    if (Array.isArray(exercise.cards) && exercise.cards.length) {
+      renderCardsExercise(exercise);
+      return;
+    }
     renderExercise(exercise);
     showScreen('exercise');
   } catch (err) {
@@ -2424,10 +2429,25 @@ async function showMyProfile() {
       `<div class="feature-bar-label"><span>${escapeHtml(r.feature || '–')}</span><span>${r.score ?? '–'}%</span></div>`
     ).join('') || '<div class="dash-empty">Noch keine Übungen.</div>';
 
+    // Merkwörter – nur echte, wiederholte Fehler. Leer heißt: es gibt keine.
+    const reg = d.wordRegister || [];
+    const regHtml = reg.length
+      ? `<div class="word-chips">${reg.map((w) =>
+          `<span class="word-chip" title="${w.wrong}x falsch geschrieben">${escapeHtml(w.word)}<b>${w.wrong}×</b></span>`
+        ).join('')}</div>`
+      : `<div class="dash-empty">Keine Merkwörter – du hast bisher kein Wort mehrfach falsch geschrieben. Weiter so!</div>`;
+
     el.innerHTML = `
       <div class="detail-card">
         <div class="stat-kicker stat-kicker-blue">Dein Stand</div>
         <p>Level <b>${d.level}</b> · ${d.points} Punkte · ${d.exercisesCompleted} Übungen · 🔥 ${d.streakDays} Tage</p>
+      </div>
+      <div class="detail-card">
+        <div class="stat-kicker stat-kicker-blue">Deine Merkwörter</div>
+        <p style="color:var(--muted);font-size:.92rem;margin:6px 0 12px">
+          Wörter, die du mehr als einmal falsch geschrieben hast.
+        </p>
+        ${regHtml}
       </div>
       <div class="detail-card">
         <div class="stat-kicker stat-kicker-blue">Deine Themen</div>
@@ -2556,7 +2576,7 @@ initAuth();
 
       // Von Unterseiten zurück aufs Dashboard
       if (['screen-my-profile', 'screen-leaderboard', 'screen-gamification',
-           'screen-upload', 'screen-exercise', 'screen-progress'].includes(id)) {
+           'screen-upload', 'screen-exercise', 'screen-cards', 'screen-progress'].includes(id)) {
         backToDashboard();
         return;
       }
@@ -2565,3 +2585,191 @@ initAuth();
     });
   } catch (e) {}
 })();
+
+/* ═══════════════════════════════════════════════════════════
+ * WORTKARTEN (Flashcards)
+ * Karte für Karte: Satz mit Lücke + Umschreibung lesen, den ganzen Satz
+ * handschriftlich abschreiben, prüfen lassen, weiterwischen.
+ * ═══════════════════════════════════════════════════════════ */
+
+const cardsState = { cards: [], index: 0, checked: false, engine: null };
+
+function ensureCardsEngine() {
+  if (cardsState.engine) return cardsState.engine;
+  cardsState.engine = createCanvasEngine({
+    canvasEl: document.getElementById('cards-canvas'),
+    placeholderEl: document.getElementById('cards-canvas-placeholder'),
+    penBtn: document.getElementById('cards-tool-pen'),
+    eraserBtn: document.getElementById('cards-tool-eraser'),
+  });
+  document.getElementById('cards-btn-undo').addEventListener('click', () => cardsState.engine.undo());
+  document.getElementById('cards-btn-expand').addEventListener('click', () => cardsState.engine.expand());
+  // Prüfen-Knopf freigeben, sobald etwas geschrieben wurde
+  setInterval(() => {
+    if (!document.getElementById('screen-cards').classList.contains('active')) return;
+    if (cardsState.checked) return;
+    document.getElementById('cards-btn-check').disabled = !cardsState.engine.hasDrawn();
+  }, 300);
+  return cardsState.engine;
+}
+
+/** Startet eine Karten-Übung. */
+function renderCardsExercise(exercise) {
+  cardsState.cards = exercise.cards || [];
+  cardsState.index = 0;
+  cardsState.checked = false;
+  document.getElementById('cards-badge').textContent = exercise.topic || 'Wortkarten';
+  showScreen('cards');
+  renderCard();
+}
+
+function renderCard() {
+  const { cards, index } = cardsState;
+  const card = cards[index];
+  if (!card) return;
+
+  cardsState.checked = false;
+  document.getElementById('cards-progress').textContent = `Karte ${index + 1} von ${cards.length}`;
+
+  // Fortschrittspunkte
+  document.getElementById('cards-dots').innerHTML = cards
+    .map((_, i) => `<span class="${i < index ? 'done' : i === index ? 'active' : ''}"></span>`)
+    .join('');
+
+  // Umschreibung + Satz mit sichtbarer Lücke
+  document.getElementById('fc-hint').textContent = card.hint || '';
+  const parts = String(card.sentence).split('___');
+  document.getElementById('fc-sentence').innerHTML = parts
+    .map((p) => escapeHtml(p))
+    .join('<span class="fc-gap"></span>');
+
+  document.getElementById('fc-feedback').hidden = true;
+  document.getElementById('fc-next').hidden = true;
+  const checkBtn = document.getElementById('cards-btn-check');
+  checkBtn.style.display = '';
+  checkBtn.disabled = true;
+
+  const engine = ensureCardsEngine();
+  setTimeout(() => { engine.resize(); engine.clear(); }, 30);
+}
+
+// ─── Karte prüfen ───
+document.getElementById('cards-btn-check').addEventListener('click', async () => {
+  const engine = cardsState.engine;
+  if (!engine || !engine.hasDrawn()) return;
+
+  const btn = document.getElementById('cards-btn-check');
+  btn.disabled = true;
+  btn.textContent = 'Wird geprüft…';
+  try {
+    const small = await downscaleImage(engine.toJpeg(0.85), 1400, 0.8);
+    const r = await apiJson('/api/card/check', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: SESSION_ID, image: small, cardIndex: cardsState.index }),
+    });
+    showCardFeedback(r);
+  } catch (e) {
+    if (handleSessionLost(e.body)) return;
+    showError(friendlyFetchError(e, 'der Prüfung'), () => showScreen('cards'));
+  } finally {
+    btn.textContent = 'Prüfen';
+  }
+});
+
+function showCardFeedback(r) {
+  cardsState.checked = true;
+  const fb = document.getElementById('fc-feedback');
+  const corrections = (r.word_corrections || [])
+    .map((c) => `
+      <div class="word-correction" style="margin-top:10px">
+        <div class="word-correction-row">
+          <span class="word-wrong">${escapeHtml(c.wrong)}</span>
+          <span class="word-arrow">→</span>
+          <span class="word-correct">${escapeHtml(c.correct)}</span>
+          ${c.fresch_strategy ? `<span class="fresch-tag fresch-tag-${String(c.fresch_strategy).toLowerCase().replace(/[^a-zä]/g,'')}">FRESCH · ${escapeHtml(c.fresch_strategy)}</span>` : ''}
+        </div>
+        ${c.explanation ? `<p class="word-explanation">${escapeHtml(c.explanation)}</p>` : ''}
+      </div>`)
+    .join('');
+
+  fb.className = 'fc-feedback ' + (r.correct ? 'ok' : 'bad');
+  fb.innerHTML = r.correct
+    ? `<div class="fc-verdict">✓ Richtig!</div>
+       <div>${escapeHtml(r.praise || 'Sauber geschrieben.')}</div>`
+    : `<div class="fc-verdict">✗ Noch nicht ganz</div>
+       <div class="fc-expected">${escapeHtml(r.expected)}</div>
+       ${corrections}`;
+  fb.hidden = false;
+
+  document.getElementById('cards-btn-check').style.display = 'none';
+  const next = document.getElementById('fc-next');
+  next.querySelector('span:last-child').textContent =
+    r.isLast ? 'Übung abschließen' : 'Weiter wischen';
+  next.hidden = false;
+}
+
+// ─── Zur nächsten Karte ───
+async function advanceCard() {
+  if (!cardsState.checked) return;
+  const isLast = cardsState.index >= cardsState.cards.length - 1;
+
+  if (isLast) {
+    // Übung abschließen – der Server verrechnet die gesammelten Kartenergebnisse
+    showScreen('loading');
+    setLoadingText('FehlerFix rechnet zusammen...', 'Gleich siehst du deinen Fortschritt.');
+    try {
+      const data = await apiJson('/api/submit-exercise', {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: SESSION_ID }),
+      });
+      localStorage.setItem('ff-ex-num', String(data.exercisesCompleted));
+      localStorage.setItem('ff-level', String(data.level));
+      renderProgress(data);
+      showScreen('progress');
+    } catch (e) {
+      if (handleSessionLost(e.body)) return;
+      showError(friendlyFetchError(e, 'dem Abschließen'), () => showScreen('cards'));
+    }
+    return;
+  }
+
+  // Karte wegwischen, dann die nächste zeigen
+  const fc = document.getElementById('flashcard');
+  fc.classList.add('leaving');
+  setTimeout(() => {
+    fc.classList.remove('leaving');
+    cardsState.index += 1;
+    renderCard();
+  }, 240);
+}
+
+document.getElementById('fc-next').addEventListener('click', advanceCard);
+
+// Echtes Wischen: nach oben/unten ziehen blättert weiter (nur nach dem Prüfen)
+(function enableCardSwipe() {
+  const screen = document.getElementById('screen-cards');
+  let startY = null;
+  const onStart = (e) => {
+    // Nicht auf dem Schreibfeld – dort wird gezeichnet
+    if (e.target.closest('.canvas-wrap')) return;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+  };
+  const onEnd = (e) => {
+    if (startY === null) return;
+    const endY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+    const dist = startY - endY;
+    startY = null;
+    if (Math.abs(dist) > 60 && cardsState.checked) advanceCard();
+  };
+  screen.addEventListener('touchstart', onStart, { passive: true });
+  screen.addEventListener('touchend', onEnd, { passive: true });
+})();
+
+// Resize-Trigger für das Karten-Canvas
+new MutationObserver(() => {
+  if (document.getElementById('screen-cards').classList.contains('active') && cardsState.engine) {
+    setTimeout(() => cardsState.engine.resize(), 30);
+  }
+}).observe(document.getElementById('screen-cards'), {
+  attributes: true, attributeFilter: ['class'],
+});

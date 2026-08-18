@@ -43,6 +43,8 @@ const {
 } = require('./lib/curriculum');
 const { freschMethodPromptBlock } = require('./lib/methods/fresch');
 const mastery = require('./lib/mastery');
+const exercises = require('./lib/exercises');
+const wordRegister = require('./lib/wordregister');
 
 // Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
 const { isDbEnabled } = require('./lib/db');
@@ -339,6 +341,14 @@ app.get('/api/student/profile-detail', requireDb, auth.requireStudent, async (re
     );
     res.json({
       errorProfile: featureTable,
+      // Merkwörter: nur Wörter, die WIEDERHOLT falsch geschrieben wurden.
+      // Leere Liste heißt: es gibt keine – nicht, dass etwas fehlt.
+      wordRegister: wordRegister.activeWords(st.wordRegister).map((e) => ({
+        word: e.word,
+        wrong: e.wrong,
+        variants: e.variants || [],
+        strategy: e.strategy || null,
+      })),
       level: st.level || 1,
       points: st.points || 0,
       exercisesCompleted: st.exercisesCompleted || 0,
@@ -1089,6 +1099,24 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
+
+/**
+ * Merkwörter-Block für die Übungs-Prompts.
+ * Gibt der KI die Wörter mit, die dieser Lerner wiederholt falsch schreibt –
+ * damit Übungen genau daran arbeiten statt an erfundenen Beispielen.
+ * Ist die Liste leer, steht hier nichts: dann gibt es schlicht keine.
+ */
+function merkwoerterBlock(session) {
+  const words = wordRegister.wordsForPrompt(session.wordRegister, 12);
+  if (!words.length) return '';
+  return (
+    'MERKWÖRTER DIESES LERNERS (wiederholt falsch geschrieben):\n' +
+    words.map((w) => '  - ' + w).join('\n') +
+    '\nBaue nach Möglichkeit einige davon in die Übung ein – das sind die echten ' +
+    'Stolpersteine. Erfinde KEINE weiteren dazu.\n\n'
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // ROUTE 2: /api/next-exercise – adaptive Übungsgenerierung
 // ─────────────────────────────────────────────────────────────
@@ -1124,62 +1152,11 @@ app.post('/api/next-exercise', async (req, res) => {
   }
   const focusEntry = weighted.find((f) => f.name === focusFeature) || weighted[0];
 
-  // ── ÜBUNGSTYP-WAHL: Round-Robin über die 3 Typen ────
-  // Damit alle Typen garantiert vorkommen (sonst wählt die KI fast nie Diktat).
-  const EXERCISE_TYPES = ['cloze_text', 'error_text', 'audio_dictation'];
-  const exType = EXERCISE_TYPES[session.exercisesCompleted % EXERCISE_TYPES.length];
-
-  const typeDescriptions = {
-    cloze_text:
-      'LÜCKENTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (4-5 Sätze, eine kleine ' +
-      'Geschichte / Beobachtung mit rotem Faden). Die Übung muss DICHT sein – viele ' +
-      'Entscheidungsstellen, nicht nur ein, zwei.\n' +
-      'ANZAHL: Erzeuge MINDESTENS 6, besser 7-10 Lücken/Entscheidungsstellen über den Text. ' +
-      'Lieber mehr Stellen als längerer Text – der Text bleibt etwa gleich lang, aber prall gefüllt ' +
-      'mit Übungsmöglichkeiten zum Fokus-Feature.\n\n' +
-      'ES GIBT ZWEI ARTEN von Lückentext, je nach Fokus-Feature:\n\n' +
-      'A) RECHTSCHREIB-FEATURES (ie/i, ss/ß, Doppelkonsonanten, Dehnung, das/dass usw.):\n' +
-      '   - Setze "___" für die Buchstabengruppe, wo das Feature greift ' +
-      '(z.B. "T___ger"→"ie", "Stra___e"→"ß", "da___ Haus"→"s").\n' +
-      '   - VERBOTEN: Lücken auf Satzzeichen, Bindestrichen, Leerzeichen, Zahlen oder ganzen Wörtern.\n' +
-      '   - Baue möglichst viele echte Vorkommen des Features ein (Ziel 6-10).\n\n' +
-      'B) ZEICHENSETZUNGS-FEATURES (Kommasetzung, Satzzeichen):\n' +
-      '   - Hier wird NICHT mit "___" gearbeitet. Stattdessen: Schreibe den Text und markiere ' +
-      'JEDE Stelle, an der MÖGLICHERWEISE ein Komma stehen könnte, mit dem Platzhalter " [ ] " ' +
-      '(Leerzeichen, eckige Klammer auf, Leerzeichen, eckige Klammer zu, Leerzeichen).\n' +
-      '   - WICHTIG: Markiere SOWOHL Stellen, an denen ein Komma hingehört, ALS AUCH Stellen, an ' +
-      'denen KEINS hingehört (Fallen). So entscheidet der Nutzer pro Stelle „Komma oder nicht".\n' +
-      '   - Ziel: 6-10 solcher Entscheidungsstellen über den Text verteilt.\n' +
-      '   - Im correctText steht der Text mit den KORREKT gesetzten Kommas (und ohne Klammern).\n' +
-      '   - instruction-Beispiel: "Schreibe den Text ab. Setze an den markierten Stellen ein Komma – ' +
-      'aber nur dort, wo eins hingehört!"\n\n' +
-      'instruction-Beispiel (Rechtschreibung): "Schreibe den Text ab und fülle die Lücken."',
-
-    error_text:
-      'FEHLERTEXT: Erstelle einen ZUSAMMENHÄNGENDEN kleinen Text (3-5 Sätze, kleine ' +
-      'Geschichte mit Sinn) mit 2-4 eingebauten Rechtschreibfehlern – ALLE zum Fokus-Feature.\n' +
-      'STRENGE REGELN:\n' +
-      '- Fehler nur in echten Wörtern, NIEMALS Satzzeichen weglassen/verschieben.\n' +
-      '- Fehler müssen authentisch sein – Verwechslungen, die Lerner dieser Klassenstufe ' +
-      'wirklich machen (z.B. "Tir" statt "Tier", nicht künstliche Fantasiefehler).\n' +
-      '- Alle anderen Wörter im Text sind 100% korrekt geschrieben.\n' +
-      '- Die Schülerin/der Schüler schreibt den korrigierten Text handschriftlich ab.\n' +
-      'instruction-Beispiel: "In diesem Text sind ein paar Fehler. Schreibe ihn richtig ab."',
-
-    audio_dictation:
-      'AUDIO-DIKTAT: Erstelle einen ZUSAMMENHÄNGENDEN, kurzen, vollständig KORREKTEN Text ' +
-      '(3-5 Sätze, kleine Geschichte mit Sinn).\n' +
-      'STRENGE REGELN:\n' +
-      '- Text wird per Sprachausgabe langsam vorgelesen, das Kind schreibt mit.\n' +
-      '- Text enthält 2-4 Wörter, in denen das Fokus-Feature vorkommt (klar hörbar, aber ' +
-      'rechtschreiblich eine Herausforderung).\n' +
-      '- KEINE Lücken, KEINE Fehler, KEINE Sonderzeichen außer normale Satzzeichen.\n' +
-      '- KEINE Anführungszeichen, KEINE Bindestrich-Komposita ("Start-Ups"), KEINE Abkürzungen, ' +
-      'KEINE Zahlen, KEINE Aufzählungen, KEINE Fremdwörter.\n' +
-      '- Text muss FLÜSSIG vorlesbar sein – natürlicher Sprachfluss.\n' +
-      '- Setze displayText auf einen leeren String "".\n' +
-      'instruction-Beispiel: "Hör gut zu und schreibe auf, was du hörst."',
-  };
+  // ── ÜBUNGSTYP-WAHL ──────────────────────────────────
+  // Aus der Registry: nur Formate, die zum Fokus-Feature passen, und unter
+  // denen möglichst das am längsten nicht genutzte (Abwechslung).
+  const chosen = exercises.pickType(focusFeature, session.recentTypes || []);
+  const exType = chosen.id;
 
   const prompt =
     'Du erstellst EINE handschriftliche Rechtschreibübung für eine Schülerin / einen Schüler.\n\n' +
@@ -1202,12 +1179,15 @@ app.post('/api/next-exercise', async (req, res) => {
     `ÜBUNGSTYP FÜR DIESE ÜBUNG (fest vorgegeben): "${exType}"\n` +
     `FOKUS-FEATURE FÜR DIESE ÜBUNG (fest vorgegeben): "${focusFeature}"\n` +
     `Diese Übung trainiert AUSSCHLIESSLICH dieses eine Feature. Keine anderen Themen.\n\n` +
-    typeDescriptions[exType] + '\n\n' +
+    merkwoerterBlock(session) +
+    chosen.spec + '\n\n' +
     'GLOBAL KRITISCHE REGELN (gelten IMMER):\n' +
     '- Aufgabenstellung (instruction) darf NIEMALS die Lösung verraten. ' +
     'Erwähne NIE konkrete Wörter aus dem Text. Schlechtes Beispiel: "Wie schreibt man Zoo-Tier?".\n' +
-    '- Der Text MUSS eine kohärente kleine Geschichte oder Beobachtung sein. ' +
-    'Sätze nehmen aufeinander Bezug, keine zusammenhanglosen Einzelsätze.\n' +
+    (['cloze_text', 'error_text', 'audio_dictation', 'find_own_errors', 'find_and_copy'].includes(exType)
+      ? '- Der Text MUSS eine kohärente kleine Geschichte oder Beobachtung sein. ' +
+        'Sätze nehmen aufeinander Bezug, keine zusammenhanglosen Einzelsätze.\n'
+      : '- Die Beispiele sollen alltagsnah und für die Klassenstufe vertraut sein.\n') +
     '- Wortschatz und Komplexität GENAU passend zur Klassenstufe.\n' +
     '- KEINE englischen Begriffe, KEINE Anglizismen, KEINE Bindestrich-Komposita ("Start-Ups", ' +
     '"E-Mail", "Hands-On") – die machen rechtschreiblich keinen Sinn als Übung.\n' +
@@ -1223,8 +1203,12 @@ app.post('/api/next-exercise', async (req, res) => {
     '\\"ie/i-Schreibung\\", \\"das/dass\\", \\"Doppelkonsonanten\\">",\n' +
     '  "instruction": "<altersgerechte Aufgabenstellung OHNE Antworten zu verraten>",\n' +
     '  "tips": ["<Achtsamkeit 1: worauf das Kind achten soll>", "<Achtsamkeit 2>", "<Achtsamkeit 3>"],\n' +
-    '  "displayText": "<der Text, der angezeigt wird – Lücken/Markierungen bei cloze_text, Fehler bei error_text, LEER bei audio_dictation>",\n' +
-    '  "correctText": "<die vollständig korrekte Lösung, die geschrieben werden sollte – bei audio_dictation: der vorzulesende Text>",\n' +
+    '  "displayText": "<das Material, das angezeigt wird – siehe Formatbeschreibung; LEER bei audio_dictation und flashcards>",\n' +
+    '  "correctText": "<die vollständig korrekte Lösung – LEER bei flashcards>",\n' +
+    (chosen.answerMode === 'cards'
+      ? '  "cards": [ { "sentence": "Satz mit ___", "hint": "Umschreibung des gesuchten Wortes", ' +
+        '"answer": "Wort", "full": "vollständiger richtiger Satz", "explanation": "kurze Erklärung" } ],\n'
+      : '') +
     '  "explanation": "<1-2 Sätze, erklärt die Regel/das WARUM des Features – wird NACH der Bewertung gezeigt>"\n' +
     '}\n\n' +
     'ZU "topic": kurzes Schlagwort, das oben über der Aufgabe als Überschrift steht. Macht sofort klar, ' +
@@ -1262,6 +1246,26 @@ app.post('/api/next-exercise', async (req, res) => {
       console.warn(`[next-exercise] KI lieferte Typ "${exercise.type}", erzwinge "${exType}".`);
       exercise.type = exType;
     }
+    // Karten-Formate: ohne brauchbare Karten ist die Übung wertlos
+    if (chosen.answerMode === 'cards') {
+      const cards = Array.isArray(exercise.cards) ? exercise.cards : [];
+      exercise.cards = cards
+        .filter((c) => c && c.sentence && c.answer)
+        .map((c) => ({
+          sentence: String(c.sentence),
+          hint: String(c.hint || ''),
+          answer: String(c.answer),
+          full: String(c.full || String(c.sentence).replace('___', c.answer)),
+          explanation: String(c.explanation || ''),
+        }));
+      if (!exercise.cards.length) {
+        console.error('[next-exercise] Karten-Format ohne Karten – KI-Antwort unbrauchbar.');
+        return res.status(502).json({ error: 'Übung konnte nicht erstellt werden.' });
+      }
+      exercise.displayText = '';
+      exercise.correctText = '';
+    }
+
     // Das vorgegebene Fokus-Feature erzwingen (Server-side Truth)
     if (exercise.focusFeature !== focusFeature) {
       console.warn(`[next-exercise] KI lieferte Fokus "${exercise.focusFeature}", erzwinge "${focusFeature}".`);
@@ -1274,6 +1278,9 @@ app.post('/api/next-exercise', async (req, res) => {
 
     session.lastFocusFeature = focusFeature;
     session.lastExercise = exercise;
+    // Format merken, damit sich die Auswahl beim nächsten Mal abwechselt
+    session.recentTypes = [exType, ...(session.recentTypes || [])].slice(0, 8);
+    session.cardProgress = null;   // neue Übung → Kartenfortschritt zurücksetzen
 
     console.log(
       `[next-exercise] OK – Typ: ${exercise.type}, Fokus: "${focusFeature}", ` +
@@ -1288,6 +1295,162 @@ app.post('/api/next-exercise', async (req, res) => {
   }
 });
 
+
+
+/**
+ * Schließt eine Karten-Übung ab.
+ * Die einzelnen Karten wurden bereits über /api/card/check bewertet; hier
+ * werden die gesammelten Ergebnisse zu Lernstand, Punkten, Streak und
+ * Wortliste verrechnet – nach denselben Regeln wie bei den anderen Formaten.
+ */
+async function finishCardExercise(req, res, ctx, session, last) {
+  const results = (session.cardProgress?.results || []).filter(Boolean);
+  const total = last.cards.length;
+  const correct = results.filter((r) => r.correct).length;
+  const ratio = total > 0 ? correct / total : 0;
+
+  // Lernstand: jede Karte ist eine Gelegenheit für das Fokus-Feature
+  applyGradingResults(
+    session.featureTable,
+    [{ feature: last.focusFeature || session.lastFocusFeature, total, correct }],
+    last.type
+  );
+  session.featureTable.sort((a, b) => a.mastery - b.mastery);
+
+  // Wortliste aus allen Karten-Korrekturen speisen
+  const allCorrections = results.flatMap((r) => r.corrections || []);
+  session.wordRegister = wordRegister.recordMistakes(session.wordRegister, allCorrections);
+
+  // Gamification – gleiche Formeln wie sonst
+  const points = Math.round(ratio * 10);
+  session.points += points;
+  session.exercisesCompleted += 1;
+  session.level = Math.floor(session.points / 100) + 1;
+  session.lastExercisePerformance = ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'medium' : 'poor';
+  session.exerciseHistory.push({
+    feature: session.lastFocusFeature,
+    score: Math.round(ratio * 100),
+  });
+  store.bumpStreak(session);
+  session.cardProgress = null;
+
+  await ctx.save();
+  if (ctx.persistent) {
+    await ctx.log({
+      feature: session.lastFocusFeature,
+      exerciseType: last.type,
+      topic: last.topic || null,
+      score: Math.round(ratio * 100),
+    });
+  }
+
+  console.log(`[submit] Kartenübung: ${correct}/${total} richtig`);
+
+  return res.json({
+    points,
+    totalPoints: session.points,
+    level: session.level,
+    pointsToNextLevel: session.level * 100 - session.points,
+    levelProgressPercent: ((session.points % 100) / 100) * 100,
+    exercisesCompleted: session.exercisesCompleted,
+    streakDays: session.streakDays || 0,
+    bestStreak: session.bestStreak || 0,
+    summary_good: correct === total
+      ? ['Alle Karten richtig – stark!']
+      : [`${correct} von ${total} Karten richtig.`],
+    word_corrections: allCorrections,
+    explanation: last.explanation || '',
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// ROUTE: /api/card/check – EINE Flashcard prüfen
+//   Karten-Übungen laufen Karte für Karte: schreiben → prüfen → weiterwischen.
+//   Hier wird nur die einzelne Karte bewertet und das Ergebnis gesammelt;
+//   abgeschlossen wird die Übung erst über /api/submit-exercise.
+// ─────────────────────────────────────────────────────────────
+app.post('/api/card/check', async (req, res) => {
+  const { sessionId, image, cardIndex } = req.body || {};
+  if ((!sessionId && !req.student) || !image) {
+    return res.status(400).json({ error: 'Anmeldung/sessionId und image erforderlich.' });
+  }
+
+  const ctx = await resolveState(req, sessionId);
+  const session = ctx.state;
+  const last = session.lastExercise;
+  const cards = last?.cards;
+  if (!Array.isArray(cards) || !cards.length) {
+    return res.status(409).json({ error: 'Keine Kartenübung aktiv.', code: 'NO_ACTIVE_EXERCISE' });
+  }
+  const idx = Math.max(0, Math.min(cards.length - 1, Number(cardIndex) || 0));
+  const card = cards[idx];
+
+  const gradeText =
+    buildContextBlock(session.profile) + '\n' +
+    'Auf dem Bild siehst du einen handgeschriebenen Satz einer Schülerin / eines Schülers.\n\n' +
+    `ERWARTETER SATZ: "${card.full}"\n` +
+    `GESUCHTES WORT IN DER LÜCKE: "${card.answer}"\n\n` +
+    'AUFGABE:\n' +
+    '1) Lies die Handschrift sorgfältig.\n' +
+    '2) Wurde der Satz vollständig und richtig geschrieben? Kleine Abweichungen in der\n' +
+    '   Handschrift sind egal – es zählt die Rechtschreibung.\n' +
+    '3) Liste JEDES falsch geschriebene Wort einzeln auf, mit kindgerechter Erklärung,\n' +
+    '   die die passende FRESCH-Strategie nennt und am Wort vorführt.\n\n' +
+    'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
+    '{\n' +
+    '  "correct": true|false,\n' +
+    '  "read_text": "<was du gelesen hast>",\n' +
+    '  "gap_correct": true|false,\n' +
+    '  "praise": "<ein kurzer, motivierender Satz>",\n' +
+    '  "word_corrections": [ { "wrong":"...", "correct":"...", ' +
+    '"fresch_strategy":"Schwingen|Verlängern|Ableiten|Merken", "explanation":"...", "feature":"..." } ]\n' +
+    '}';
+
+  try {
+    const lang = getLanguage(session.profile?.language);
+    const { text } = await callClaude({
+      label: 'card',
+      systemPrompt:
+        lang.graderRole +
+        ' Du antwortest IMMER ausschließlich mit gültigem JSON (kein Markdown-Block, kein Erklärtext).',
+      userContent: [toImageBlock(image), { type: 'text', text: gradeText }],
+      maxTokens: 1200,
+    });
+
+    let g;
+    try {
+      g = parseJsonResponse(text);
+    } catch (e) {
+      console.error('[card] JSON-Parse-Fehler. Roh-Antwort:\n' + text);
+      return res.status(502).json({ error: 'Antwort konnte nicht gelesen werden.' });
+    }
+
+    // Ergebnis sammeln (für den Abschluss der Übung)
+    const progress = session.cardProgress || { results: [] };
+    progress.results[idx] = {
+      correct: Boolean(g.correct),
+      corrections: Array.isArray(g.word_corrections) ? g.word_corrections : [],
+    };
+    session.cardProgress = progress;
+    await ctx.save();
+
+    const done = progress.results.filter(Boolean).length;
+    return res.json({
+      correct: Boolean(g.correct),
+      praise: g.praise || '',
+      expected: card.full,
+      explanation: card.explanation || '',
+      word_corrections: progress.results[idx].corrections,
+      cardIndex: idx,
+      cardsTotal: cards.length,
+      cardsDone: done,
+      isLast: idx >= cards.length - 1,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: 'Karte konnte nicht geprüft werden.' });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────
 // ROUTE 3: /api/submit-exercise
 //   Vision-basiertes Grading: KI liest die handschriftliche Antwort,
@@ -1296,18 +1459,27 @@ app.post('/api/next-exercise', async (req, res) => {
 // ─────────────────────────────────────────────────────────────
 app.post('/api/submit-exercise', async (req, res) => {
   const { sessionId, image } = req.body || {};
-  if ((!sessionId && !req.student) || !image) {
-    return res.status(400).json({ error: 'Anmeldung/sessionId und image erforderlich.' });
+  if (!sessionId && !req.student) {
+    return res.status(400).json({ error: 'Anmeldung/sessionId erforderlich.' });
   }
 
   const ctx = await resolveState(req, sessionId);
   const session = ctx.state;
   const last = session.lastExercise;
-  if (!last || !last.correctText) {
+  const isCardExercise = Array.isArray(last?.cards) && last.cards.length > 0;
+
+  if (!last || (!last.correctText && !isCardExercise)) {
     return res.status(409).json({
       error: 'Keine aktive Übung gefunden.',
       code: 'NO_ACTIVE_EXERCISE',
     });
+  }
+  // Karten-Übungen wurden Karte für Karte geprüft – hier wird nur abgeschlossen.
+  if (isCardExercise) {
+    return finishCardExercise(req, res, ctx, session, last);
+  }
+  if (!image) {
+    return res.status(400).json({ error: 'image erforderlich.' });
   }
 
   const sizeKb = Math.round((image.length * 0.75) / 1024);
@@ -1325,6 +1497,14 @@ app.post('/api/submit-exercise', async (req, res) => {
     'BEKANNTE FEATURES (Memory):\n' +
     JSON.stringify(session.featureTable, null, 2) +
     '\n\n' +
+    (() => {
+      const words = wordRegister.wordsForPrompt(session.wordRegister, 15);
+      if (!words.length) return '';
+      return 'MERKWÖRTER DIESES LERNERS (schreibt er wiederholt falsch):\n' +
+        words.map((w) => '  - ' + w).join('\n') + '\n' +
+        'Melde unter "register_correct", welche dieser Wörter in der Lösung vorkamen ' +
+        'UND richtig geschrieben waren. Nur tatsächlich vorhandene Wörter – nichts erfinden.\n\n';
+    })() +
     'AUFGABE:\n' +
     '1) Lies die Handschrift sorgfältig (bestes Bemühen, auch wenn unsauber).\n' +
     '2) Vergleiche mit der erwarteten Lösung.\n' +
@@ -1361,7 +1541,8 @@ app.post('/api/submit-exercise', async (req, res) => {
     '  ],\n' +
     '  "new_features_detected": [\n' +
     '    { "name":"...", "reason":"...", "evidence":"...", "total":N, "correct":N }\n' +
-    '  ]\n' +
+    '  ],\n' +
+    '  "register_correct": ["Merkwörter, die diesmal RICHTIG geschrieben waren"]\n' +
     '}';
 
   // Anthropic-Konvention: Bild zuerst, dann Anweisungstext
@@ -1399,6 +1580,18 @@ app.post('/api/submit-exercise', async (req, res) => {
     applyGradingResults(session.featureTable, aiGrading.results, last.type);
     addedFeatures = addNewFeatures(session.featureTable, aiGrading.new_features_detected);
     session.featureTable.sort((a, b) => a.mastery - b.mastery);
+
+    // Wortliste pflegen: falsch geschriebene Wörter zählen, richtig geschriebene
+    // Merkwörter gutschreiben. Aufgenommen wird nur, was WIEDERHOLT falsch war.
+    session.wordRegister = wordRegister.recordMistakes(
+      session.wordRegister, aiGrading.word_corrections);
+    session.wordRegister = wordRegister.recordCorrect(
+      session.wordRegister, aiGrading.register_correct);
+    const merk = wordRegister.activeWords(session.wordRegister);
+    if (merk.length) {
+      console.log(`[submit] Merkwörter (${merk.length}): ` +
+        merk.slice(0, 6).map((e) => `${e.word}(${e.wrong}x)`).join(', '));
+    }
 
     const score = clamp(aiGrading.overall_score, 0, 100);
     ratio = score / 100;

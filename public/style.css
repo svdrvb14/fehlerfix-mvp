@@ -2175,3 +2175,162 @@ body {
   font-style: normal;
   color: var(--coral);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WORTKARTEN (Flashcards)
+   ═══════════════════════════════════════════════════════════ */
+.cards-wrap {
+  max-width: 800px;
+  margin: 0 auto;
+}
+.cards-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.cards-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.cards-dots span {
+  width: 26px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.2s ease;
+}
+.cards-dots span.done { background: #6dbe7a; }
+.cards-dots span.active { background: var(--coral); }
+
+/* Die Karte selbst */
+.flashcard {
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.09);
+  padding: 26px 28px;
+  margin-bottom: 18px;
+  border-top: 5px solid var(--coral);
+  animation: fcIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes fcIn {
+  from { opacity: 0; transform: translateY(26px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Wisch-Animation beim Kartenwechsel */
+.flashcard.leaving {
+  animation: fcOut 0.26s ease forwards;
+}
+@keyframes fcOut {
+  to { opacity: 0; transform: translateY(-40px) scale(0.97); }
+}
+.fc-hint {
+  background: var(--blue-soft);
+  color: var(--blue-medium);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+.fc-hint::before {
+  content: '💡 ';
+}
+.fc-sentence {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 1.45rem;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.fc-sentence .fc-gap {
+  display: inline-block;
+  min-width: 74px;
+  border-bottom: 3px solid var(--coral);
+  margin: 0 4px;
+}
+
+/* Rückmeldung */
+.fc-feedback {
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  animation: fcIn 0.25s ease;
+}
+.fc-feedback[hidden] { display: none; }
+.fc-feedback.ok {
+  background: #f4fbf5;
+  border-left: 4px solid #6dbe7a;
+}
+.fc-feedback.bad {
+  background: #fff6f5;
+  border-left: 4px solid var(--coral);
+}
+.fc-verdict {
+  font-weight: 800;
+  font-size: 1.05rem;
+  margin-bottom: 6px;
+}
+.fc-feedback.ok .fc-verdict { color: #2a6c34; }
+.fc-feedback.bad .fc-verdict { color: var(--coral); }
+.fc-expected {
+  font-family: 'Georgia', serif;
+  font-size: 1.05rem;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+}
+
+/* Weiter-wischen-Button */
+.fc-next {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--blue-medium);
+  cursor: pointer;
+  padding: 18px 0 8px;
+}
+.fc-next[hidden] { display: none; }
+.fc-next-arrow {
+  font-size: 1.8rem;
+  line-height: 1;
+  animation: fcBounce 1.4s ease-in-out infinite;
+}
+@keyframes fcBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(7px); }
+}
+
+/* Merkwörter als Chips */
+.word-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.word-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--coral-soft);
+  color: #a8423d;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.word-chip b {
+  font-size: 0.78rem;
+  opacity: 0.75;
+  font-weight: 600;
+}

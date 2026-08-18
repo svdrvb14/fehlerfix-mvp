@@ -13,7 +13,7 @@
     "mobile:open:ios": "cap open ios",
     "mobile:open:android": "cap open android",
     "mobile:build": "node scripts/set-api-base.js https://fehlerfix.onrender.com && cap sync",
-    "test": "node test/mastery.test.js"
+    "test": "node test/mastery.test.js && node test/exercises.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",

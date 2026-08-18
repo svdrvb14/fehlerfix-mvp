@@ -274,3 +274,8 @@ Punkte: `round(0.75 × 10)` = **8**.
 | Laden/Speichern | `lib/store.js` | `loadStudentState`, `saveStudentState` |
 | Curriculum-Kontext | `lib/curriculum.js` | `curriculumPromptBlock` |
 | FRESCH-Methodik | `lib/methods/fresch.js` | `freschMethodPromptBlock` |
+
+---
+
+Die Übungsformate selbst – welche es gibt, wie ausgewählt wird und wie die
+Wortliste der Merkwörter entsteht – stehen in [UEBUNGSFORMATE.md](UEBUNGSFORMATE.md).

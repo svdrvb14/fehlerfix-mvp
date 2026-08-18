@@ -439,6 +439,62 @@
         </div>
       </section>
 
+
+      <!-- ── SCREEN: Wortkarten (Flashcards, Swipe-Modus) ─── -->
+      <section class="screen" id="screen-cards">
+        <div class="cards-wrap">
+          <div class="cards-topbar">
+            <span class="ex-num" id="cards-progress">Karte 1 von 5</span>
+            <span class="level-badge" id="cards-badge">Wortkarten</span>
+          </div>
+          <div class="cards-dots" id="cards-dots"></div>
+
+          <!-- Die Karte -->
+          <div class="flashcard" id="flashcard">
+            <div class="fc-hint" id="fc-hint"></div>
+            <div class="fc-sentence" id="fc-sentence"></div>
+          </div>
+
+          <!-- Schreibfläche -->
+          <div class="card notebook-card">
+            <div class="notebook-header">
+              <span class="notebook-label">Schreib den ganzen Satz</span>
+              <div class="notebook-actions">
+                <button class="link-action" id="cards-btn-undo">⌫ Rückgängig</button>
+              </div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="cards-canvas"></canvas>
+              <div class="canvas-placeholder" id="cards-canvas-placeholder">
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                  <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                </svg>
+                <span>Schreibe hier...</span>
+              </div>
+            </div>
+            <div class="tool-row">
+              <button class="tool-pill active" id="cards-tool-pen">✏️ Stift</button>
+              <button class="tool-pill" id="cards-tool-eraser">🩹 Radierer</button>
+              <button class="canvas-expand" id="cards-btn-expand">⌄ Mehr Platz</button>
+            </div>
+          </div>
+
+          <!-- Rückmeldung nach dem Prüfen -->
+          <div class="fc-feedback" id="fc-feedback" hidden></div>
+
+          <div class="ex-footer">
+            <button class="btn-primary" id="cards-btn-check" disabled>Prüfen</button>
+          </div>
+
+          <!-- Wisch-Hinweis / Weiter -->
+          <button class="fc-next" id="fc-next" hidden>
+            <span class="fc-next-arrow">⌄</span>
+            <span>Weiter wischen</span>
+          </button>
+        </div>
+      </section>
+
       <!-- ── SCREEN 4: Übung ──────────────────────────────── -->
       <section class="screen" id="screen-exercise">
         <div class="exercise-wrap">
