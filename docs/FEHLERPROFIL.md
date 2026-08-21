@@ -279,3 +279,9 @@ Punkte: `round(0.75 × 10)` = **8**.
 
 Die Übungsformate selbst – welche es gibt, wie ausgewählt wird und wie die
 Wortliste der Merkwörter entsteht – stehen in [UEBUNGSFORMATE.md](UEBUNGSFORMATE.md).
+
+Wie zuverlässig die Handschrift-Erkennung selbst ist – und was dagegen
+konkret getan wurde bzw. als nächster, größerer Schritt ansteht – steht in
+[HANDSCHRIFT-ERKENNUNG.md](HANDSCHRIFT-ERKENNUNG.md). Woher die Übungen
+selbst kommen (KI-generiert vs. echtes Lehrmaterial) steht in
+[UEBUNGSBANK.md](UEBUNGSBANK.md).

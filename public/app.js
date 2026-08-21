@@ -744,14 +744,20 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
 
   // Beim Export ans Vision-Grading: weißer Hintergrund unterlegen, OHNE die CSS-Schullinien.
   // Damit „sieht" die KI nur den Strich des Kindes, nicht die Heftlinien.
-  function toJpeg(quality = 0.85) {
+  //
+  // Skaliert und kodiert in EINEM Schritt (statt wie früher erst hier, dann nochmal
+  // in downscaleImage) – zwei verlustbehaftete JPEG-Durchgänge nacheinander verwaschen
+  // gerade dünne Handschrift-Striche unnötig. Ein sauberer Pass bei der Zielgröße liest
+  // sich für die KI klar besser, bei gleichem oder kleinerem Datenvolumen.
+  function toJpeg({ maxDim = 1500, quality = 0.92 } = {}) {
+    const scale = Math.min(1, maxDim / Math.max(canvasEl.width, canvasEl.height));
     const off = document.createElement('canvas');
-    off.width = canvasEl.width;
-    off.height = canvasEl.height;
+    off.width = Math.round(canvasEl.width * scale);
+    off.height = Math.round(canvasEl.height * scale);
     const oc = off.getContext('2d');
     oc.fillStyle = '#ffffff';
     oc.fillRect(0, 0, off.width, off.height);
-    oc.drawImage(canvasEl, 0, 0);
+    oc.drawImage(canvasEl, 0, 0, off.width, off.height);
     return off.toDataURL('image/jpeg', quality);
   }
 
@@ -876,9 +882,12 @@ function createBrowserTTS({ lang = 'de-DE', rate = 0.55, pitch = 1.0 } = {}) {
 const tts = createBrowserTTS({ lang: 'de-DE', rate: 0.7 });
 
 // ─────────────────────────────────────────────────────────
-// Bild runterskalieren vor Upload
+// Bild runterskalieren vor Upload (für Foto-Uploads – z.B. Klassenarbeit
+// abfotografiert. Canvas-Handschrift geht direkt über toJpeg() in der
+// Zielgröße raus und läuft NICHT mehr zusätzlich hier durch, damit
+// Handschrift nicht zweimal verlustbehaftet komprimiert wird.)
 // ─────────────────────────────────────────────────────────
-function downscaleImage(dataUrl, maxWidth = 1200, quality = 0.78) {
+function downscaleImage(dataUrl, maxWidth = 1200, quality = 0.85) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -965,7 +974,7 @@ document.getElementById('btn-next-text').addEventListener('click', () => {
     alert('Bitte schreib zuerst etwas in das Notizbuch.');
     return;
   }
-  state.capturedImages.push(writeEngine.toJpeg(0.85));
+  state.capturedImages.push(writeEngine.toJpeg({ maxDim: 1000, quality: 0.85 }));
   if (state.currentTopicIndex < state.selectedTopics.length - 1) {
     state.currentTopicIndex += 1;
     loadTopic(state.currentTopicIndex);
@@ -1013,15 +1022,13 @@ async function runAnalysis() {
   setLoadingText('FehlerFix analysiert deine Texte...', 'Bereite deine Texte vor...');
   try {
     // Datengrundlage = hochgeladene Texte (falls vorhanden) + geschriebene Texte
-    const sources = [
+    // Beide Quellen sind schon in Zielgröße erzeugt (Foto-Upload: downscaleImage
+    // beim Auswählen; Notizbuch: toJpeg direkt in Zielgröße) – kein zweiter
+    // Kompressions-Durchgang hier mehr, der nur Details verwaschen würde.
+    const small = [
       ...(typeof onboarding !== 'undefined' ? onboarding.uploadImages : []),
       ...state.capturedImages,
     ];
-    // Kleinere Bilder = kleinerer Body = robuster über WLAN/iPad-Hotspots
-    const small = [];
-    for (const img of sources) {
-      small.push(await downscaleImage(img, 1000, 0.72));
-    }
     const kb = Math.round(small.reduce((s, d) => s + d.length * 0.75, 0) / 1024);
     console.log(`[analyze] Sende ~${kb} KB an Server (${small.length} Bilder)`);
 
@@ -1428,8 +1435,8 @@ document.getElementById('btn-check').addEventListener('click', async () => {
   showScreen('loading');
   setLoadingText('FehlerFix prüft deine Lösung...', 'Schaue mir deine Schrift genau an...');
   try {
-    const raw = engine.toJpeg(0.85);
-    const small = await downscaleImage(raw, 1400, 0.8);
+    // Einzelbild, wird bewertet → höchste sinnvolle Qualität, ein Kompressions-Durchgang.
+    const small = engine.toJpeg({ maxDim: 1500, quality: 0.92 });
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 300000); // 5 min
@@ -1536,6 +1543,20 @@ function renderProgress(data) {
     explCard.style.display = '';
   } else {
     explCard.style.display = 'none';
+  }
+
+  // Ehrlichkeits-Hinweis: Wörter, die die KI beim Lesen nicht sicher entziffern
+  // konnte, wurden NICHT gewertet (weder richtig noch falsch) – das hier zeigt
+  // es kurz an, statt eine unsichere Lesung als Tatsache zu präsentieren.
+  const unsure = Array.isArray(data.unsure_words) ? data.unsure_words.filter(Boolean) : [];
+  const unsureEl = document.getElementById('unsure-note');
+  if (unsure.length) {
+    unsureEl.innerHTML =
+      `👀 Bei ${unsure.length === 1 ? 'einem Wort' : unsure.length + ' Wörtern'} war die Schrift ` +
+      `nicht eindeutig lesbar – die wurden nicht gewertet: ${unsure.map(escapeHtml).join(' · ')}`;
+    unsureEl.style.display = '';
+  } else {
+    unsureEl.style.display = 'none';
   }
 }
 
@@ -2258,7 +2279,7 @@ async function takePhoto() {
         saveToGallery: false,
       });
       if (photo?.dataUrl) {
-        const small = await downscaleImage(photo.dataUrl, 1400, 0.8);
+        const small = await downscaleImage(photo.dataUrl, 1500, 0.85);
         onboarding.uploadImages.push(small);
         renderUploadPreview();
       }
@@ -2284,7 +2305,7 @@ document.getElementById('btn-pick-files').addEventListener('click', () => {
     for (const f of files) {
       try {
         const raw = await fileToDataUrl(f);
-        const small = await downscaleImage(raw, 1400, 0.8);
+        const small = await downscaleImage(raw, 1500, 0.85);
         onboarding.uploadImages.push(small);
       } catch (err) {
         console.error('[upload] Bild konnte nicht gelesen werden', err);
@@ -2662,7 +2683,7 @@ document.getElementById('cards-btn-check').addEventListener('click', async () =>
   btn.disabled = true;
   btn.textContent = 'Wird geprüft…';
   try {
-    const small = await downscaleImage(engine.toJpeg(0.85), 1400, 0.8);
+    const small = engine.toJpeg({ maxDim: 1500, quality: 0.92 });
     const r = await apiJson('/api/card/check', {
       method: 'POST',
       body: JSON.stringify({ sessionId: SESSION_ID, image: small, cardIndex: cardsState.index }),
@@ -2692,13 +2713,20 @@ function showCardFeedback(r) {
       </div>`)
     .join('');
 
+  const unsure = Array.isArray(r.unsure_words) ? r.unsure_words.filter(Boolean) : [];
+  const unsureHtml = unsure.length
+    ? `<div class="unsure-note">👀 Nicht eindeutig lesbar, nicht gewertet: ${unsure.map(escapeHtml).join(' · ')}</div>`
+    : '';
+
   fb.className = 'fc-feedback ' + (r.correct ? 'ok' : 'bad');
   fb.innerHTML = r.correct
     ? `<div class="fc-verdict">✓ Richtig!</div>
-       <div>${escapeHtml(r.praise || 'Sauber geschrieben.')}</div>`
+       <div>${escapeHtml(r.praise || 'Sauber geschrieben.')}</div>
+       ${unsureHtml}`
     : `<div class="fc-verdict">✗ Noch nicht ganz</div>
        <div class="fc-expected">${escapeHtml(r.expected)}</div>
-       ${corrections}`;
+       ${corrections}
+       ${unsureHtml}`;
   fb.hidden = false;
 
   document.getElementById('cards-btn-check').style.display = 'none';

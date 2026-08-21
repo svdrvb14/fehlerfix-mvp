@@ -47,9 +47,10 @@ const exercises = require('./lib/exercises');
 const wordRegister = require('./lib/wordregister');
 
 // Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
-const { isDbEnabled } = require('./lib/db');
+const { supabase, isDbEnabled } = require('./lib/db');
 const auth = require('./lib/auth');
 const store = require('./lib/store');
+const exerciseBank = require('./lib/exercisebank');
 const cookieParser = require('cookie-parser');
 
 const app = express();
@@ -1158,6 +1159,29 @@ app.post('/api/next-exercise', async (req, res) => {
   const chosen = exercises.pickType(focusFeature, session.recentTypes || []);
   const exType = chosen.id;
 
+  // ── ÜBUNGSBANK ZUERST ────────────────────────────────
+  // Geprüftes Material aus echten Lehrwerken schlägt eine KI-Neuerzeugung.
+  // Nur für eingeloggte Schüler (Bank-Historie braucht eine studentId).
+  if (isDbEnabled && ctx.persistent) {
+    const bankRow = await exerciseBank.pickFromBank(supabase, {
+      format: exType,
+      focusFeature,
+      grade: session.profile?.grade,
+      studentId: ctx.studentId,
+    });
+    if (bankRow) {
+      const exercise = exerciseBank.toExercise(bankRow, focusFeature);
+      await exerciseBank.markUsed(supabase, ctx.studentId, bankRow.id);
+      session.lastFocusFeature = focusFeature;
+      session.lastExercise = exercise;
+      session.recentTypes = [exType, ...(session.recentTypes || [])].slice(0, 8);
+      session.cardProgress = null;
+      console.log(`[next-exercise] Bank-Treffer – Typ: ${exType}, Fokus: "${focusFeature}", Quelle: ${bankRow.source_file || '-'}`);
+      await ctx.save();
+      return res.json(exercise);
+    }
+  }
+
   const prompt =
     'Du erstellst EINE handschriftliche Rechtschreibübung für eine Schülerin / einen Schüler.\n\n' +
     buildContextBlock(session.profile) + '\n' +
@@ -1391,11 +1415,16 @@ app.post('/api/card/check', async (req, res) => {
     `ERWARTETER SATZ: "${card.full}"\n` +
     `GESUCHTES WORT IN DER LÜCKE: "${card.answer}"\n\n` +
     'AUFGABE:\n' +
-    '1) Lies die Handschrift sorgfältig.\n' +
+    '1) Lies die Handschrift sorgfältig, WORT FÜR WORT gegen den erwarteten Satz.\n' +
     '2) Wurde der Satz vollständig und richtig geschrieben? Kleine Abweichungen in der\n' +
     '   Handschrift sind egal – es zählt die Rechtschreibung.\n' +
     '3) Liste JEDES falsch geschriebene Wort einzeln auf, mit kindgerechter Erklärung,\n' +
-    '   die die passende FRESCH-Strategie nennt und am Wort vorführt.\n\n' +
+    '   die die passende FRESCH-Strategie nennt und am Wort vorführt.\n' +
+    '4) Ist ein einzelner Buchstabe eines Wortes wirklich nicht sicher zu erkennen (nicht ' +
+    '   nur unordentlich, sondern mehrdeutig – z.B. e/i nicht unterscheidbar), zähle dieses ' +
+    '   Wort NICHT als Fehler und NICHT als richtig. Trag es stattdessen in "unsure_words" ' +
+    '   ein. Rate NICHT zugunsten von richtig oder falsch – ehrliche Unsicherheit ist besser ' +
+    '   als eine falsche Zählung, die dem Lernstand schadet.\n\n' +
     'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
     '{\n' +
     '  "correct": true|false,\n' +
@@ -1403,7 +1432,8 @@ app.post('/api/card/check', async (req, res) => {
     '  "gap_correct": true|false,\n' +
     '  "praise": "<ein kurzer, motivierender Satz>",\n' +
     '  "word_corrections": [ { "wrong":"...", "correct":"...", ' +
-    '"fresch_strategy":"Schwingen|Verlängern|Ableiten|Merken", "explanation":"...", "feature":"..." } ]\n' +
+    '"fresch_strategy":"Schwingen|Verlängern|Ableiten|Merken", "explanation":"...", "feature":"..." } ],\n' +
+    '  "unsure_words": ["<kurz: welches Wort, was war unklar>"]\n' +
     '}';
 
   try {
@@ -1441,6 +1471,7 @@ app.post('/api/card/check', async (req, res) => {
       expected: card.full,
       explanation: card.explanation || '',
       word_corrections: progress.results[idx].corrections,
+      unsure_words: Array.isArray(g.unsure_words) ? g.unsure_words : [],
       cardIndex: idx,
       cardsTotal: cards.length,
       cardsDone: done,
@@ -1506,14 +1537,20 @@ app.post('/api/submit-exercise', async (req, res) => {
         'UND richtig geschrieben waren. Nur tatsächlich vorhandene Wörter – nichts erfinden.\n\n';
     })() +
     'AUFGABE:\n' +
-    '1) Lies die Handschrift sorgfältig (bestes Bemühen, auch wenn unsauber).\n' +
+    '1) Lies die Handschrift sorgfältig, WORT FÜR WORT gegen die erwartete Lösung – ' +
+    '   du kennst den erwarteten Text bereits, nutze ihn zum Abgleichen statt frei zu raten.\n' +
     '2) Vergleiche mit der erwarteten Lösung.\n' +
     '3) ZÄHLE für das Fokus-Feature: wie viele GELEGENHEITEN gab es in dieser Übung\n' +
     '   (alle Stellen, an denen die Regel greift) und wie viele davon waren KORREKT?\n' +
     '4) Zähle genauso für ANDERE bekannte Features, falls in der Lösung beobachtbar.\n' +
     '5) Erkenne NEUE Fehlermuster (spezifisch, trainierbar, keine vagen Stil-Probleme).\n' +
     '6) Liste JEDES FALSCH GESCHRIEBENE WORT einzeln als word_corrections (siehe unten).\n' +
-    '7) Gib einen overall_score 0-100 für diese Übung.\n\n' +
+    '7) Ist ein Wort wirklich mehrdeutig geschrieben (nicht nur unordentlich, sondern z.B.\n' +
+    '   e/i oder n/m nicht unterscheidbar), zähle es NICHT als Fehler und NICHT als richtig –\n' +
+    '   weder in word_corrections noch in den Zählungen unter "results". Trag es stattdessen\n' +
+    '   in "unsure_words" ein. Eine falsche Zählung schadet dem Lernstand mehr als eine ehrliche\n' +
+    '   Lücke – rate nicht zugunsten von richtig oder falsch.\n' +
+    '8) Gib einen overall_score 0-100 für diese Übung.\n\n' +
     'WICHTIG word_corrections: Jedes Wort, das die Schülerin/der Schüler falsch geschrieben hat, ' +
     'kommt als eigener Eintrag in die Liste – mit der korrekten Schreibweise und einer kindgerechten, ' +
     'altersangemessenen Erklärung. Die Erklärung MUSS die FRESCH-Strategie (Schwingen / Verlängern / ' +
@@ -1542,7 +1579,8 @@ app.post('/api/submit-exercise', async (req, res) => {
     '  "new_features_detected": [\n' +
     '    { "name":"...", "reason":"...", "evidence":"...", "total":N, "correct":N }\n' +
     '  ],\n' +
-    '  "register_correct": ["Merkwörter, die diesmal RICHTIG geschrieben waren"]\n' +
+    '  "register_correct": ["Merkwörter, die diesmal RICHTIG geschrieben waren"],\n' +
+    '  "unsure_words": ["<kurz: welches Wort, was war unklar>"]\n' +
     '}';
 
   // Anthropic-Konvention: Bild zuerst, dann Anweisungstext
@@ -1645,6 +1683,7 @@ app.post('/api/submit-exercise', async (req, res) => {
     bestStreak: session.bestStreak || 0,
     summary_good: aiGrading?.summary_good || [],
     word_corrections: Array.isArray(aiGrading?.word_corrections) ? aiGrading.word_corrections : [],
+    unsure_words: Array.isArray(aiGrading?.unsure_words) ? aiGrading.unsure_words : [],
     explanation: last.explanation || '',
   });
 });

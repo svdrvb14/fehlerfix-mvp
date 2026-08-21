@@ -1383,6 +1383,20 @@ body {
   line-height: 1.55;
 }
 
+.unsure-note {
+  background: var(--coral-soft);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin: 0 0 22px;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.fc-feedback .unsure-note {
+  margin: 10px 0 0;
+}
+
 /* ─── Responsive (iPad/Tablet) ───────────────────────── */
 @media (max-width: 760px) {
   .nav {
