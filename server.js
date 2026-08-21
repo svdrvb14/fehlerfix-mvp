@@ -1118,6 +1118,26 @@ function merkwoerterBlock(session) {
   );
 }
 
+/**
+ * Block für die Grading-Prompts, wenn das Frontend zusätzlich Kandidaten aus
+ * der on-device Stift-Erkennung (Google ML Kit Digital Ink, nur nativ)
+ * mitschickt. Die liest die tatsächliche Schreibbewegung statt nur das
+ * fertige Bild – ein starker, aber kein unfehlbarer Hinweis. Leer, wenn das
+ * Frontend nichts mitschickt (Web, oder Modell noch nicht heruntergeladen).
+ */
+function inkCandidatesBlock(inkCandidates) {
+  const list = Array.isArray(inkCandidates) ? inkCandidates.filter(Boolean) : [];
+  if (!list.length) return '';
+  return (
+    'STIFT-ERKENNUNG (on-device, liest die Schreibbewegung statt nur das Bild – ' +
+    'zuverlässiger als reines Bild-Lesen, aber nicht unfehlbar):\n' +
+    list.map((c, i) => `  ${i + 1}. "${c}"`).join('\n') +
+    '\nNutze das als starken Hinweis beim Lesen der Handschrift. Zeigt das Bild ' +
+    'eindeutig etwas anderes, vertraue dem Bild – bei unklaren/mehrdeutigen ' +
+    'Buchstaben bevorzuge diese Kandidaten.\n\n'
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // ROUTE 2: /api/next-exercise – adaptive Übungsgenerierung
 // ─────────────────────────────────────────────────────────────
@@ -1394,7 +1414,7 @@ async function finishCardExercise(req, res, ctx, session, last) {
 //   abgeschlossen wird die Übung erst über /api/submit-exercise.
 // ─────────────────────────────────────────────────────────────
 app.post('/api/card/check', async (req, res) => {
-  const { sessionId, image, cardIndex } = req.body || {};
+  const { sessionId, image, cardIndex, inkCandidates } = req.body || {};
   if ((!sessionId && !req.student) || !image) {
     return res.status(400).json({ error: 'Anmeldung/sessionId und image erforderlich.' });
   }
@@ -1414,6 +1434,7 @@ app.post('/api/card/check', async (req, res) => {
     'Auf dem Bild siehst du einen handgeschriebenen Satz einer Schülerin / eines Schülers.\n\n' +
     `ERWARTETER SATZ: "${card.full}"\n` +
     `GESUCHTES WORT IN DER LÜCKE: "${card.answer}"\n\n` +
+    inkCandidatesBlock(inkCandidates) +
     'AUFGABE:\n' +
     '1) Lies die Handschrift sorgfältig, WORT FÜR WORT gegen den erwarteten Satz.\n' +
     '2) Wurde der Satz vollständig und richtig geschrieben? Kleine Abweichungen in der\n' +
@@ -1489,7 +1510,7 @@ app.post('/api/card/check', async (req, res) => {
 //   und erkennt neue Fehlermuster.
 // ─────────────────────────────────────────────────────────────
 app.post('/api/submit-exercise', async (req, res) => {
-  const { sessionId, image } = req.body || {};
+  const { sessionId, image, inkCandidates } = req.body || {};
   if (!sessionId && !req.student) {
     return res.status(400).json({ error: 'Anmeldung/sessionId erforderlich.' });
   }
@@ -1525,6 +1546,7 @@ app.post('/api/submit-exercise', async (req, res) => {
     `- Fokus-Feature: ${last.focusFeature || session.lastFocusFeature}\n` +
     `- Angezeigter Text (Aufgabe): "${last.displayText}"\n` +
     `- Erwartete korrekte Lösung: "${last.correctText}"\n\n` +
+    inkCandidatesBlock(inkCandidates) +
     'BEKANNTE FEATURES (Memory):\n' +
     JSON.stringify(session.featureTable, null, 2) +
     '\n\n' +

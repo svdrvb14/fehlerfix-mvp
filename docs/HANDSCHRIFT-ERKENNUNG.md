@@ -60,42 +60,81 @@ Zielgröße:
 
 Siehe [public/app.js](../public/app.js), Funktionen `toJpeg` und `downscaleImage`.
 
-## Hebel 3 (nicht umgesetzt – eigene Entscheidung nötig): Stroke-Daten statt Bild
+## Hebel 3 (umgesetzt, Frontend/Backend fertig – natives Setup steht noch aus): Stroke-Daten statt Bild
 
-Das ist der eigentlich große Hebel, und er verändert die Architektur:
-**FehlerFix zeichnet die Handschrift bereits als Stift-Striche auf dem
-Canvas** (Punkt für Punkt, mit Bézier-Glättung fürs Aussehen) – aber diese
-Rohdaten werden aktuell verworfen. Am Ende wird nur ein flaches JPEG-Bild
-an Claude geschickt, und Claude erkennt Buchstaben wie bei einem Foto von
-Papier: aus Pixeln, ohne zu wissen, in welcher Reihenfolge und mit welcher
-Bewegung die Striche entstanden sind.
+Das ist der eigentlich große Hebel: **FehlerFix zeichnet die Handschrift
+bereits als Stift-Striche auf dem Canvas** (Punkt für Punkt, mit
+Bézier-Glättung fürs Aussehen) – bisher wurden diese Rohdaten verworfen und
+nur ein flaches JPEG-Bild verschickt. Claude erkannte Buchstaben also wie bei
+einem Foto von Papier: aus Pixeln, ohne zu wissen, in welcher Reihenfolge und
+mit welcher Bewegung die Striche entstanden sind.
 
 **Online-Handwriting-Recognition** (Erkennung direkt aus den Stift-Koordinaten
-über die Zeit, nicht aus dem fertigen Bild) ist in der Forschung und in der
-Praxis deutlich zuverlässiger als Bild-OCR – genau deshalb funktioniert z.B.
-handschriftliche Texteingabe auf dem iPad/in Gboard so gut: die Engines
-sehen die Schreibbewegung, nicht nur das Ergebnis.
+über die Zeit) ist deutlich zuverlässiger als Bild-OCR – genau deshalb
+funktioniert handschriftliche Texteingabe auf dem iPad/in Gboard so gut: die
+Engines sehen die Schreibbewegung, nicht nur das Ergebnis.
 
-Zwei konkrete, einsetzbare Optionen:
+Entscheidung: **Google ML Kit – Digital Ink Recognition**
+(`@capacitor-mlkit/digital-ink-recognition`, offizielles, gepflegtes Plugin
+von [capawesome-team](https://github.com/capawesome-team/capacitor-mlkit)).
+Kostenlos, läuft komplett auf dem Gerät (kein Cloud-Aufruf), unterstützt
+Deutsch (`de`). MyScript (kommerziell) wäre vermutlich die noch höhere
+Genauigkeit, aber mit Lizenzkosten – bei Bedarf später nachrüstbar, das
+Plugin-Interface ist dafür ausgetauscht.
 
-| Option | Kosten | Eignung |
-|---|---|---|
-| **Google ML Kit – Digital Ink Recognition** | Kostenlos, offline, unterstützt Deutsch | Native Capacitor-Plugin-Integration nötig (iOS + Android). Kein Cloud-Aufruf, läuft auf dem Gerät. |
-| **MyScript (iink SDK)** | Kommerziell (Lizenzkosten), aber die Referenz für Handschrift-Erkennung, auch bei Kinderschrift | Ebenfalls native Integration; für den App-Store-Launch ggf. die höhere Genauigkeit wert |
+### Wie es eingebaut ist
 
-Beide brauchen: die rohen Stroke-Punkte (x, y, Zeitstempel – die entstehen
-sowieso schon beim Zeichnen in `createCanvasEngine`, siehe
-[public/app.js](../public/app.js)) statt/zusätzlich zum flachen Bild, plus ein
-natives Plugin für Capacitor. Das ist ein eigenständiges Stück Arbeit mit
-einer echten Kosten-/Aufwandsentscheidung (kostenlos + Aufwand vs. bezahlt +
-vermutlich beste Genauigkeit) – deshalb hier nur dokumentiert, nicht
-stillschweigend gebaut.
+**Hybrid, nicht Ersatz:** ML Kit liest die Stift-Bewegung und liefert bis zu
+drei Kandidaten-Texte. Diese Kandidaten werden dem bestehenden
+Claude-Bewertungs-Prompt als zusätzlicher Hinweis mitgegeben – Claude macht
+weiterhin den semantischen Abgleich, die FRESCH-Erklärung und die
+Zählungen fürs Fehlerprofil, hat aber jetzt einen unabhängigen, sehr
+zuverlässigen Lese-Hinweis zur Hand statt nur der Pixel.
 
-**Realistischer Zwischenschritt ohne native SDKs:** die Stroke-Daten (Punkte,
-Geschwindigkeit, Stift-Auf/Ab) zusätzlich zum Bild mitschicken und Claude im
-Prompt beschreiben – bringt einen Teil des Signals (z.B. "wurde in einem Zug
-geschrieben" hilft bei zusammengeschriebenen Buchstaben), aber nicht die
-Zuverlässigkeit einer echten Ink-Recognition-Engine, die dafür trainiert ist.
+```
+Canvas-Engine (public/app.js, createCanvasEngine)
+  └─ inkStrokes: jeder Messpunkt mit Zeitstempel, GETRENNT von den
+     geglätteten Zeichen-Punkten. Radiergummi/Rückgängig → inkValid=false
+     (Zuordnung zum Bild dann nicht mehr sicher, fällt sauber auf
+     Bild-Erkennung zurück, kein Fehlerfall).
+  └─ engine.getInk() → { strokes, writingArea } oder null
+
+recognizeInk() (public/app.js)
+  └─ nur nativ aktiv (window.FF_IS_NATIVE), sonst/immer sicher [] zurück
+  └─ ensureInkModel() lädt das deutsche Modell einmalig beim App-Start
+  └─ Zugriff über window.Capacitor.Plugins.DigitalInkRecognition – wie beim
+     Camera-Plugin kein <script>-Import nötig, Capacitor registriert
+     installierte native Plugins automatisch
+
+/api/submit-exercise, /api/card/check (server.js)
+  └─ optionales Feld inkCandidates im Request
+  └─ inkCandidatesBlock() hängt die Kandidaten als Hinweis an den
+     Grading-Prompt – fehlt das Feld (Web, Modell noch nicht geladen),
+     verhält sich alles exakt wie vorher
+```
+
+### Was noch fehlt: die native Einrichtung
+
+Das Plugin ist installiert (`@capacitor-mlkit/digital-ink-recognition` in
+`package.json`), aber `ios/` und `android/` existieren in diesem Arbeits-
+verzeichnis noch nicht (siehe [MOBILE.md](MOBILE.md)). Sobald sie angelegt
+sind, braucht es EINMALIG:
+
+**iOS** – `ios/App/Podfile`, Deployment-Target auf mindestens 15.5 setzen:
+```
+platform :ios, '15.5'
+```
+Danach `npx cap sync` (installiert den CocoaPod).
+
+**Android** – keine Pflicht-Einstellung; optional in
+`android/variables.gradle` eine andere ML-Kit-Version erzwingen
+(`mlkitDigitalInkRecognitionVersion`, Default 19.0.0).
+
+Danach: `npm run mobile:build` (oder `mobile:sync`), auf einem Gerät/
+Simulator starten, einmal etwas schreiben und prüfen (Konsole zeigt
+`[ink] Deutsches Stift-Erkennungsmodell bereit.`, sonst eine Warnung mit
+Grund). Ab dann läuft die Stift-Erkennung automatisch mit – ohne, dass sich
+am bisherigen Ablauf sonst etwas ändert.
 
 ## Wo das für die Wortauswahl schon eingebaut ist
 

@@ -492,10 +492,15 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     });
   }
 
+  // Schreibfläche in CSS-Pixeln (= Koordinatenraum der Stift-Punkte unten) –
+  // für die ML-Kit-Stift-Erkennung, die dieselbe Einheit wie die Punkte braucht.
+  let writingAreaSize = { width: 0, height: 0 };
+
   function resize() {
     const rect = canvasEl.getBoundingClientRect();
     // Nicht resizen, wenn das Canvas (noch) nicht sichtbar ist
     if (rect.width <= 0 || rect.height <= 0) return;
+    writingAreaSize = { width: rect.width, height: rect.height };
 
     const dpr = window.devicePixelRatio || 1;
     const newWidth = Math.round(rect.width * dpr);
@@ -565,8 +570,19 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
   const ERASER_WIDTH = 24;
   const MIN_STEP = 0.7; // Messpunkte, die enger liegen, sind nur Zittern
 
-  let strokePts = [];   // Messpunkte des laufenden Strichs
+  let strokePts = [];   // Messpunkte des laufenden Strichs (fürs Zeichnen, wird kurz gehalten)
   let curWidth = PEN_WIDTH;
+
+  // ─── Rohe Stift-Züge (für die ML-Kit-Stift-Erkennung, siehe recognizeInk) ───
+  // Anders als strokePts (nur für die Bézier-Glättung, wird laufend gekürzt)
+  // bleibt hier JEDER Messpunkt mit Zeitstempel erhalten – das ist genau das
+  // Format, das ML Kit für die Erkennung direkt aus der Schreibbewegung braucht
+  // (zuverlässiger als das spätere Lesen aus dem fertigen Bild).
+  // Radiergummi oder Rückgängig machen die Zuordnung zum sichtbaren Bild
+  // unsicher → dann wird die Stift-Erkennung für dieses Blatt einfach
+  // übersprungen (inkValid=false), es bleibt bei der Bild-Erkennung.
+  let inkStrokes = [];
+  let inkValid = true;
 
   const midPoint = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 
@@ -602,6 +618,12 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     strokePts = [p];
     curWidth = tool === 'eraser' ? ERASER_WIDTH : PEN_WIDTH;
 
+    if (tool === 'eraser') {
+      inkValid = false; // Zuordnung Strich↔Bild nicht mehr sicher
+    } else {
+      inkStrokes.push({ points: [{ x: p.x, y: p.y, t: Date.now() }] });
+    }
+
     // Startpunkt setzen, damit auch ein kurzes Antippen sichtbar ist
     beginStrokeStyle(curWidth);
     ctx.beginPath();
@@ -620,6 +642,9 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
     if (dist < MIN_STEP) return; // Zittern herausfiltern
     strokePts.push(p);
+    if (tool !== 'eraser' && inkStrokes.length) {
+      inkStrokes[inkStrokes.length - 1].points.push({ x: p.x, y: p.y, t: Date.now() });
+    }
 
     const n = strokePts.length;
     beginStrokeStyle(widthFor(dist));
@@ -705,11 +730,14 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     ctx.lineJoin = 'round';
     ctx.globalCompositeOperation = 'source-over';
     history.length = 0;
+    inkStrokes = [];
+    inkValid = true;
     setDrawn(false);
   }
 
   // Rückgängig: den letzten Strich entfernen (Zustand vor dem Strich wiederherstellen)
   function undo() {
+    inkValid = false; // Schnappschuss ist Pixel, nicht Strich-genau – Zuordnung nicht mehr sicher
     if (!history.length) {
       clear();
       return;
@@ -728,6 +756,14 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
       if (history.length === 0) setDrawn(false);
     };
     img.src = snap;
+  }
+
+  // Rohe Stift-Züge für die ML-Kit-Stift-Erkennung (siehe recognizeInk weiter
+  // unten). null, wenn seit dem letzten clear() radiert/rückgängig gemacht
+  // wurde – dann ist die Zuordnung zum Bild nicht mehr sicher genug.
+  function getInk() {
+    if (!inkValid || !inkStrokes.length) return null;
+    return { strokes: inkStrokes, writingArea: writingAreaSize };
   }
 
   // Mehr Platz: Notizbuch-Höhe schrittweise vergrößern (Inhalt bleibt via resize erhalten)
@@ -768,6 +804,7 @@ function createCanvasEngine({ canvasEl, placeholderEl, penBtn, eraserBtn }) {
     expand,
     hasDrawn: () => drawn,
     toJpeg,
+    getInk,
     canvasEl,
   };
 }
@@ -906,6 +943,72 @@ function downscaleImage(dataUrl, maxWidth = 1200, quality = 0.85) {
     img.onerror = () => resolve(dataUrl);
     img.src = dataUrl;
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// On-Device Stift-Erkennung (Google ML Kit Digital Ink Recognition)
+//
+// Liest die Handschrift aus der tatsächlichen Schreibbewegung (Stift-Punkte
+// mit Zeitstempel), nicht aus dem fertigen Bild – das ist der Grund, warum
+// Handschrift-Eingabe auf dem iPad/in Gboard zuverlässig funktioniert.
+// Nur nativ verfügbar (iOS/Android), kein Web-Backend. Auf dem Web und
+// solange das Sprachmodell noch nicht heruntergeladen ist, liefert
+// recognizeInk() einfach [] zurück – die Bild-Erkennung durch Claude läuft
+// in JEDEM Fall unverändert weiter, das hier ist ein zusätzlicher Hinweis,
+// kein Ersatz. Siehe docs/HANDSCHRIFT-ERKENNUNG.md.
+//
+// Kein <script>-Import nötig: Capacitor registriert installierte native
+// Plugins automatisch unter window.Capacitor.Plugins.<Name> – genau wie
+// beim Camera-Plugin oben (takePhoto()).
+// ─────────────────────────────────────────────────────────
+const INK_LANG = 'de';
+let inkModelReady = false;
+
+function inkPlugin() {
+  return window.Capacitor?.Plugins?.DigitalInkRecognition || null;
+}
+
+// Beim App-Start einmal anstoßen (nicht blockierend) – lädt das deutsche
+// Modell einmalig herunter und behält es auf dem Gerät.
+async function ensureInkModel() {
+  if (!window.FF_IS_NATIVE) return;
+  const plugin = inkPlugin();
+  if (!plugin) return;
+  try {
+    const { languageTags } = await plugin.getDownloadedModels();
+    if (languageTags?.includes(INK_LANG)) {
+      inkModelReady = true;
+      return;
+    }
+    await plugin.downloadModel({ languageTag: INK_LANG });
+    inkModelReady = true;
+    console.log('[ink] Deutsches Stift-Erkennungsmodell bereit.');
+  } catch (e) {
+    console.warn('[ink] Modell konnte nicht vorbereitet werden – Bild-Erkennung läuft normal weiter.', e?.message || e);
+  }
+}
+ensureInkModel();
+
+// Erkennt Text aus den rohen Stift-Zügen eines Canvas-Engines (engine.getInk()).
+// Gibt bei jedem Problem (kein Modell, nicht nativ, Radiergummi benutzt, ...)
+// einfach [] zurück statt zu werfen – der Aufrufer behandelt das als "kein
+// zusätzlicher Hinweis", niemals als Fehler.
+async function recognizeInk(ink) {
+  if (!ink || !inkModelReady) return [];
+  const plugin = inkPlugin();
+  if (!plugin) return [];
+  try {
+    const { candidates } = await plugin.recognize({
+      languageTag: INK_LANG,
+      strokes: ink.strokes,
+      writingArea: ink.writingArea,
+      maxResultCount: 3,
+    });
+    return (candidates || []).map((c) => c.text).filter(Boolean);
+  } catch (e) {
+    console.warn('[ink] Erkennung fehlgeschlagen – kein zusätzlicher Hinweis diesmal.', e?.message || e);
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1437,12 +1540,14 @@ document.getElementById('btn-check').addEventListener('click', async () => {
   try {
     // Einzelbild, wird bewertet → höchste sinnvolle Qualität, ein Kompressions-Durchgang.
     const small = engine.toJpeg({ maxDim: 1500, quality: 0.92 });
+    // Zusätzlich, wenn verfügbar: on-device Stift-Erkennung als Lese-Hinweis.
+    const inkCandidates = await recognizeInk(engine.getInk());
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 300000); // 5 min
     const res = await apiFetch('/api/submit-exercise', {
       method: 'POST',
-      body: JSON.stringify({ sessionId: SESSION_ID, image: small }),
+      body: JSON.stringify({ sessionId: SESSION_ID, image: small, inkCandidates }),
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -2684,9 +2789,10 @@ document.getElementById('cards-btn-check').addEventListener('click', async () =>
   btn.textContent = 'Wird geprüft…';
   try {
     const small = engine.toJpeg({ maxDim: 1500, quality: 0.92 });
+    const inkCandidates = await recognizeInk(engine.getInk());
     const r = await apiJson('/api/card/check', {
       method: 'POST',
-      body: JSON.stringify({ sessionId: SESSION_ID, image: small, cardIndex: cardsState.index }),
+      body: JSON.stringify({ sessionId: SESSION_ID, image: small, cardIndex: cardsState.index, inkCandidates }),
     });
     showCardFeedback(r);
   } catch (e) {

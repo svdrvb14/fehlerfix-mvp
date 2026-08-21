@@ -38,6 +38,11 @@ npm run mobile:add:ios       # legt ios/ an
 npm run mobile:add:android   # legt android/ an
 ```
 
+Danach einmalig für die Stift-Erkennung (siehe
+[HANDSCHRIFT-ERKENNUNG.md](HANDSCHRIFT-ERKENNUNG.md)): in `ios/App/Podfile`
+das Deployment-Target auf `platform :ios, '15.5'` setzen, dann
+`npx cap sync`. Android braucht keine Pflicht-Einstellung.
+
 ## Bei jeder Änderung an der App
 
 ```bash
