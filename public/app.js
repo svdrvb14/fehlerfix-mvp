@@ -1771,11 +1771,10 @@ async function apiJson(path, opts) {
   return data;
 }
 
-// Nav-Menü-Button sichtbar machen wenn eingeloggt
-function refreshNavForUser() {
-  const menuBtn = document.getElementById('btn-open-menu');
-  if (menuBtn) menuBtn.hidden = !authState.user;
-}
+// Das Menü ist immer erreichbar – auch ohne Account (z.B. beim Onboarding
+// als Gast), damit man sich jederzeit nachträglich anmelden kann. Nur der
+// INHALT im Menü unterscheidet sich (siehe renderDrawer).
+function refreshNavForUser() {}
 
 // ─── Init: wer ist eingeloggt? ───
 async function initAuth() {
@@ -1998,7 +1997,22 @@ async function renderDrawer() {
   const u = authState.user;
   const userBox = document.getElementById('drawer-user');
   const nav = document.getElementById('drawer-nav');
-  if (!u) { userBox.innerHTML = ''; nav.innerHTML = ''; return; }
+  if (!u) {
+    userBox.innerHTML =
+      `<div class="du-name">Nicht angemeldet</div>` +
+      `<div class="du-meta">Du nutzt FehlerFix gerade als Gast – dein Fortschritt wird nicht gespeichert.</div>`;
+    nav.innerHTML = '';
+    // Ohne Datenbank (authState.authEnabled=false) gibt es gar kein Login-System –
+    // dann macht der Button keinen Sinn, es bleibt beim reinen Gast-Hinweis.
+    if (authState.authEnabled) {
+      addDrawerItem(nav, 'Anmelden / Registrieren', () => {
+        closeDrawer();
+        renderAuthScreen();
+        showScreen('auth');
+      });
+    }
+    return;
+  }
 
   const name = u.displayName || u.email || 'Angemeldet';
   // Zweite Zeile: nicht dieselbe Angabe doppelt zeigen

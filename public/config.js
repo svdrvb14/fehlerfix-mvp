@@ -12,7 +12,7 @@
  */
 window.FF_CONFIG = {
   // Leer = gleiche Herkunft (Web). Für native Builds z.B. 'https://fehlerfix.onrender.com'
-  apiBase: '',
+  apiBase: 'https://fehlerfix.onrender.com',
 };
 
 // Läuft die App in der nativen Hülle (Capacitor) statt im Browser?

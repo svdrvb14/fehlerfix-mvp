@@ -38,6 +38,9 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /* Verhindert, dass man über den Seitenrand hinauswischen kann – in der
+     nativen App (WKWebView) wird sonst dahinter Schwarz sichtbar. */
+  overscroll-behavior: none;
 }
 
 body {

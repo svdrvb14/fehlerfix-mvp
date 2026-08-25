@@ -2,10 +2,12 @@
   "appId": "com.fehlerfix.app",
   "appName": "FehlerFix",
   "webDir": "public",
+  "backgroundColor": "#FAFAF7",
   "server": {
     "androidScheme": "https"
   },
   "ios": {
+    "backgroundColor": "#FAFAF7",
     "contentInset": "always",
     "limitsNavigationsToAppBoundDomains": false
   },
