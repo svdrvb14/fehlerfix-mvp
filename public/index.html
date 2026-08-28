@@ -195,9 +195,9 @@
               <span class="tile-sub">Wer übt am meisten?</span>
             </button>
             <button class="sdash-tile" id="btn-sdash-gamification">
-              <span class="tile-icon">🎖️</span>
-              <span class="tile-title">Abzeichen</span>
-              <span class="tile-sub">Deine Erfolge</span>
+              <span class="tile-icon">🏝️</span>
+              <span class="tile-title">Meine Insel</span>
+              <span class="tile-sub">Münzen, Abzeichen &amp; Bauen</span>
             </button>
           </div>
 
@@ -291,13 +291,27 @@
         </div>
       </section>
 
-      <!-- ── SCREEN: Abzeichen / Gamification ─────────────── -->
+      <!-- ── SCREEN: Meine Insel (Münzen, Abzeichen, Bauen) ── -->
       <section class="screen" id="screen-gamification">
         <div class="dash-wrap">
           <button class="link-action" data-back-dash>← Zurück zum Dashboard</button>
-          <div class="kicker">Deine Erfolge</div>
-          <h1 class="title-l">Abzeichen</h1>
-          <p class="lead">Sammle Abzeichen, indem du regelmäßig übst und besser wirst.</p>
+          <div class="kicker">Deine Belohnungen</div>
+          <h1 class="title-l">Meine Insel</h1>
+          <p class="lead">Jede geschaffte Übung bringt dir Münzen – bau dir damit deine eigene Insel.</p>
+
+          <div class="island-coins">
+            <span class="island-coins-icon">🪙</span>
+            <span class="island-coins-num" id="island-coins-num">0</span>
+            <span class="island-coins-label">Münzen</span>
+          </div>
+
+          <div class="island-section-title">Deine Insel</div>
+          <div class="island-grid" id="island-grid"><div class="dash-empty">Lade Insel…</div></div>
+
+          <div class="island-section-title">Shop</div>
+          <div class="island-shop" id="island-shop"></div>
+
+          <div class="island-section-title">Abzeichen</div>
           <div class="badge-grid" id="badge-grid"></div>
         </div>
       </section>

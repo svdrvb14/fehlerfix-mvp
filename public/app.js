@@ -1589,7 +1589,8 @@ function renderProgress(data) {
     data.pointsToNextLevel > 0
       ? `Noch ${data.pointsToNextLevel} Punkte bis Level ${data.level + 1}`
       : `Level ${data.level} erreicht!`;
-  document.getElementById('stat-points-delta').textContent = `+${data.points} in dieser Übung`;
+  document.getElementById('stat-points-delta').textContent =
+    `+${data.points} in dieser Übung` + (data.coins ? ` · 🪙 +${data.coins} für Meine Insel` : '');
   document.getElementById('stat-exercises').textContent = data.exercisesCompleted;
 
   const fill = document.getElementById('level-progress-fill');
@@ -2660,6 +2661,64 @@ async function showGamification() {
   } catch (e) {
     grid.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
   }
+  await loadIsland();
+}
+
+// ─── Meine Insel: Münzen, gekaufte Gegenstände, Shop ───
+async function loadIsland() {
+  const islandGrid = document.getElementById('island-grid');
+  const shop = document.getElementById('island-shop');
+  try {
+    const d = await apiJson('/api/island/state');
+    renderIsland(d);
+  } catch (e) {
+    islandGrid.innerHTML = `<div class="dash-empty">Fehler: ${escapeHtml(e.message)}</div>`;
+    shop.innerHTML = '';
+  }
+}
+
+function renderIsland(d) {
+  document.getElementById('island-coins-num').textContent = d.coins;
+
+  const islandGrid = document.getElementById('island-grid');
+  if (!d.items.length) {
+    islandGrid.innerHTML = '<div class="dash-empty">Noch leer – kauf dir unten deinen ersten Gegenstand!</div>';
+  } else {
+    islandGrid.innerHTML = d.items
+      .map((it) => d.catalog.find((c) => c.id === it.itemId))
+      .filter(Boolean)
+      .map((item) => `<div class="island-item" title="${escapeHtml(item.name)}">${item.icon}</div>`)
+      .join('');
+  }
+
+  const shop = document.getElementById('island-shop');
+  shop.innerHTML = d.catalog.map((item) => {
+    const affordable = d.coins >= item.cost;
+    return `
+      <div class="shop-item">
+        <div class="shop-item-icon">${item.icon}</div>
+        <div class="shop-item-name">${escapeHtml(item.name)}</div>
+        <button class="shop-item-buy" data-item-id="${item.id}" ${affordable ? '' : 'disabled'}>
+          🪙 ${item.cost}
+        </button>
+      </div>`;
+  }).join('');
+
+  shop.querySelectorAll('.shop-item-buy').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        const res = await apiJson('/api/island/buy', {
+          method: 'POST',
+          body: JSON.stringify({ itemId: btn.dataset.itemId }),
+        });
+        renderIsland({ coins: res.coins, items: res.items, catalog: d.catalog });
+      } catch (e) {
+        btn.disabled = false;
+        alert(e.message);
+      }
+    });
+  });
 }
 
 // Vom Fortschritts-Screen zurück aufs Dashboard (nur für eingeloggte Schüler sinnvoll)

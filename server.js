@@ -45,6 +45,7 @@ const { freschMethodPromptBlock } = require('./lib/methods/fresch');
 const mastery = require('./lib/mastery');
 const exercises = require('./lib/exercises');
 const wordRegister = require('./lib/wordregister');
+const island = require('./lib/island');
 
 // Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
 const { supabase, isDbEnabled } = require('./lib/db');
@@ -372,6 +373,38 @@ app.get('/api/student/leaderboard', requireDb, auth.requireStudent, async (req, 
     res.json({ inClass: true, range, entries, meId: req.student.id });
   } catch (e) {
     res.status(500).json({ error: 'Bestenliste konnte nicht geladen werden.' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// "Meine Insel" – Münzen + gekaufte Gegenstände.
+// ─────────────────────────────────────────────────────────────
+app.get('/api/island/state', requireDb, auth.requireStudent, async (req, res) => {
+  try {
+    const st = await store.loadStudentState(req.student.id, req.student.profile);
+    res.json({
+      coins: st.coins || 0,
+      items: st.islandItems || [],
+      catalog: island.catalog(),
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Insel konnte nicht geladen werden.' });
+  }
+});
+
+app.post('/api/island/buy', requireDb, auth.requireStudent, async (req, res) => {
+  const { itemId } = req.body || {};
+  if (!itemId) return res.status(400).json({ error: 'itemId erforderlich.' });
+  try {
+    const st = await store.loadStudentState(req.student.id, req.student.profile);
+    const result = island.buy(st, itemId);
+    if (!result.ok) return res.status(400).json({ error: result.error });
+    st.coins = result.coins;
+    st.islandItems = result.islandItems;
+    await store.saveStudentState(req.student.id, st);
+    res.json({ coins: st.coins, items: st.islandItems });
+  } catch (e) {
+    res.status(500).json({ error: 'Kauf fehlgeschlagen.' });
   }
 });
 
@@ -1355,6 +1388,7 @@ async function finishCardExercise(req, res, ctx, session, last) {
   // Gamification – gleiche Formeln wie sonst
   const points = Math.round(ratio * 10);
   session.points += points;
+  session.coins = (session.coins || 0) + points; // eigene Insel-Währung, wächst parallel
   session.exercisesCompleted += 1;
   session.level = Math.floor(session.points / 100) + 1;
   session.lastExercisePerformance = ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'medium' : 'poor';
@@ -1380,6 +1414,8 @@ async function finishCardExercise(req, res, ctx, session, last) {
   return res.json({
     points,
     totalPoints: session.points,
+    coins: points,
+    totalCoins: session.coins || 0,
     level: session.level,
     pointsToNextLevel: session.level * 100 - session.points,
     levelProgressPercent: ((session.points % 100) / 100) * 100,
@@ -1657,6 +1693,7 @@ app.post('/api/submit-exercise', async (req, res) => {
   // ─── Gamification ──────────────────────────────────
   const points = Math.round(ratio * 10);
   session.points += points;
+  session.coins = (session.coins || 0) + points; // eigene Insel-Währung, wächst parallel
   session.exercisesCompleted += 1;
   session.level = Math.floor(session.points / 100) + 1;
   session.lastExercisePerformance = ratio >= 0.8 ? 'good' : ratio >= 0.5 ? 'medium' : 'poor';
@@ -1684,6 +1721,8 @@ app.post('/api/submit-exercise', async (req, res) => {
   return res.json({
     points,
     totalPoints: session.points,
+    coins: points,
+    totalCoins: session.coins || 0,
     level: session.level,
     pointsToNextLevel,
     levelProgressPercent,
