@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalPage } from "@/components/LegalPage";
 
 export const metadata: Metadata = {
@@ -85,6 +86,15 @@ export default function WarumSoTeuerPage() {
         aus KI-Analyse, individuellem Lernpfad und ständiger
         Weiterentwicklung – für zwei Sprachen, auf jedem Niveau.
       </p>
+
+      <div className="flex justify-center">
+        <Link
+          href="/tipps"
+          className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-white px-4 py-1.5 text-sm font-medium text-ink/70 shadow-sm transition duration-150 hover:border-blue/30 hover:text-blue"
+        >
+          💡 Tipps zu den Preisen
+        </Link>
+      </div>
     </LegalPage>
   );
 }
