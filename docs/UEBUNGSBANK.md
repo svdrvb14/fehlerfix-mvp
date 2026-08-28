@@ -33,7 +33,33 @@ keine "schon gesehen"-Historie, und ohne die wären Wiederholungen möglich.
 Gäste bekommen weiterhin ausschließlich KI-generierte Übungen; das ist kein
 Funktionsverlust, nur ein bewusster Fallback.
 
+## Zwei Wege rein – je nachdem, woher das Material kommt
+
+Es gibt zwei Einlese-Skripte. Welches ihr nutzt, hängt NICHT von der Technik ab,
+sondern von den Rechten am Quellmaterial:
+
+| | `scripts/ingest-exercise-bank.js` | `scripts/inspire-exercise-bank.js` |
+|---|---|---|
+| Für | Eigenes Material (selbst erstellte Arbeitsblätter, offizielle CC/OER-lizenzierte Materialien) | Material, an dem ihr keine Rechte habt (z.B. gekaufte Verlags-Lehrwerke ohne Partnervertrag) |
+| Wie | EIN KI-Aufruf liest die Seite und übernimmt Inhalt direkt | ZWEI komplett getrennte KI-Aufrufe: der erste liest die Seite und gibt nur die abstrakte Struktur zurück (Format, Fehlerkategorie, Thema, Schwierigkeitsgrad – keine Sätze/Wörter); der zweite bekommt NUR diese Struktur, sieht die Quellseite nie, und schreibt eine komplett neue Übung |
+| Ergebnis in der DB | `generation_method='transcribed'` | `generation_method='inspired'` + `structure_source` (zeigt genau, was der zweite Schritt wusste) |
+
+Der Hintergrund dazu – Ideen/Methoden sind frei nutzbar, die konkrete
+Formulierung eines Verlags ist es nicht, und Umformulieren direkt neben der
+Vorlage reicht rechtlich nicht aus (siehe die Unterhaltung, in der das für
+FehlerFix eingeordnet wurde). `inspire-exercise-bank.js` setzt genau die
+saubere Trennung um: der Schritt, der tatsächlich schreibt, hat technisch
+gar keinen Zugriff auf die Quelle – nur auf die abstrahierten Eckdaten.
+
+**Faustregel:** Uneindeutig? `inspire-exercise-bank.js` nutzen – kostet nur
+einen zusätzlichen KI-Aufruf pro Übung, ist aber rechtlich klar sauberer.
+
 ## Wie die 500 Seiten reinkommen
+
+Die folgenden Schritte gelten für `ingest-exercise-bank.js` (eigenes
+Material). Für `inspire-exercise-bank.js` ist Schritt 1 identisch, Schritt 3
+lautet `node scripts/inspire-exercise-bank.js /pfad --grade 3` – die
+Zwischenschritte (Migration, unsichere Fälle kontrollieren) sind gleich.
 
 ### Schritt 1: Dateien bereitlegen
 
@@ -45,14 +71,17 @@ pro Kapitel). Beides gemischt geht.
 > einem sehr großen PDF vorher in Kapitel aufteilen (macOS Vorschau →
 > Seiten löschen/exportieren, oder `pdftk in.pdf cat 1-30 output teil1.pdf`).
 
-### Schritt 2: Migration einspielen (einmalig)
+### Schritt 2: Migrationen einspielen (einmalig)
 
 ```bash
 cat supabase/migrations/0004_exercise_bank.sql
+cat supabase/migrations/0005_exercise_bank_provenance.sql
 ```
 
-Inhalt in den Supabase SQL Editor kopieren und ausführen (wie bei den
-vorherigen Migrationen auch).
+Beide Inhalte nacheinander in den Supabase SQL Editor kopieren und
+ausführen (wie bei den vorherigen Migrationen auch). 0005 ergänzt nur zwei
+Spalten (`generation_method`, `structure_source`) – ohne sie schlägt das
+Speichern mit `inspire-exercise-bank.js` fehl.
 
 ### Schritt 3: Einlesen lassen
 

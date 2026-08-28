@@ -1225,20 +1225,7 @@ app.post('/api/next-exercise', async (req, res) => {
     `Diese Übung trainiert AUSSCHLIESSLICH dieses eine Feature. Keine anderen Themen.\n\n` +
     merkwoerterBlock(session) +
     chosen.spec + '\n\n' +
-    'GLOBAL KRITISCHE REGELN (gelten IMMER):\n' +
-    '- Aufgabenstellung (instruction) darf NIEMALS die Lösung verraten. ' +
-    'Erwähne NIE konkrete Wörter aus dem Text. Schlechtes Beispiel: "Wie schreibt man Zoo-Tier?".\n' +
-    (['cloze_text', 'error_text', 'audio_dictation', 'find_own_errors', 'find_and_copy'].includes(exType)
-      ? '- Der Text MUSS eine kohärente kleine Geschichte oder Beobachtung sein. ' +
-        'Sätze nehmen aufeinander Bezug, keine zusammenhanglosen Einzelsätze.\n'
-      : '- Die Beispiele sollen alltagsnah und für die Klassenstufe vertraut sein.\n') +
-    '- Wortschatz und Komplexität GENAU passend zur Klassenstufe.\n' +
-    '- KEINE englischen Begriffe, KEINE Anglizismen, KEINE Bindestrich-Komposita ("Start-Ups", ' +
-    '"E-Mail", "Hands-On") – die machen rechtschreiblich keinen Sinn als Übung.\n' +
-    '- KEINE Eigennamen mit Sonderschreibung (z.B. "iPhone", "McDonald\'s") – nur deutsche ' +
-    'Alltagswörter, die ein Schüler dieser Klasse aktiv schreiben sollte.\n' +
-    '- Vor der finalen Antwort PRÜFE selbst: Würde ein Lehrer diese Übung im Heft akzeptieren? ' +
-    'Wenn nein, formuliere um.\n\n' +
+    exercises.globalRules(exType) +
     'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
     '{\n' +
     `  "type": "${exType}",\n` +
