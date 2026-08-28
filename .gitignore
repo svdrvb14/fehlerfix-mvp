@@ -15,10 +15,19 @@ yarn-error.log*
 # IDE / Tools
 .vscode/
 .idea/
-.claude/
+.claude/*
+# ...außer den Agent-Definitionen – das ist wiederverwendbares Projekt-
+# Tooling (Übungsreihen-Pipeline), kein persönliches Editor-Setting.
+!.claude/agents/
 
 # Logs
 *.log
+
+# Rohes Quellmaterial für die Übungsbank (u.a. urheberrechtlich sensibel,
+# z.B. gescannte Verlags-Lehrwerke) + Zwischenstände der Agent-Pipeline.
+# Gehört NIE ins Repo – nur der fertige, selbst geschriebene Output landet
+# in Supabase. Siehe .claude/agents/ und docs/UEBUNGSBANK.md.
+/material/
 
 # Build artefacts
 dist/

@@ -54,6 +54,30 @@ gar keinen Zugriff auf die Quelle – nur auf die abstrahierten Eckdaten.
 **Faustregel:** Uneindeutig? `inspire-exercise-bank.js` nutzen – kostet nur
 einen zusätzlichen KI-Aufruf pro Übung, ist aber rechtlich klar sauberer.
 
+## Dritter Weg: die Agent-Pipeline (für sehr große Mengen, z.B. Westermann)
+
+`inspire-exercise-bank.js` macht dieselbe Clean-Room-Trennung, aber als ein
+einziges, stilles Skript. Für ein paar hundert Seiten, bei denen man das
+Ergebnis lieber schrittweise sieht und ein zusammenfassendes Konzept-
+Dokument haben will, gibt es dieselbe Trennung als drei Claude-Code-Agents
+unter `.claude/agents/`:
+
+| Agent | Entspricht |
+|---|---|
+| `fehlerfix-page-screener` | Schritt A von `inspire-exercise-bank.js` – liest Seiten, gibt nur Struktur zurück |
+| `fehlerfix-exercise-writer` | Schritt B – schreibt eine Übung NUR aus der Struktur, sieht nie die Quelle |
+| `fehlerfix-curriculum-assembler` | Prüft Stichproben, führt `scripts/assemble-exercise-bank.js` aus (schreibt in die DB), erzeugt `material/UEBUNGSREIHE-KONZEPT.md` |
+
+Ablauf: Seiten in `material/` (lokal, NIE ins Git – siehe `.gitignore`)
+ablegen → Screener über die Seiten laufen lassen (schreibt nach
+`material/_work/*.structures.json`) → für jede gefundene Struktur den
+Verfasser aufrufen (schreibt nach `material/_work/*.exercise-*.json`) →
+zum Schluss den Assembler, der alles zusammenführt.
+
+`.claude/agents/` ist – anders als der Rest von `.claude/` – bewusst NICHT
+gitignored: das ist wiederverwendbares Projekt-Tooling, kein persönliches
+Editor-Setting.
+
 ## Wie die 500 Seiten reinkommen
 
 Die folgenden Schritte gelten für `ingest-exercise-bank.js` (eigenes

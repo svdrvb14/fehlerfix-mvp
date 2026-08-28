@@ -15,6 +15,7 @@
     "mobile:build": "node scripts/set-api-base.js https://fehlerfix.onrender.com && cap sync",
     "bank:ingest": "node scripts/ingest-exercise-bank.js",
     "bank:inspire": "node scripts/inspire-exercise-bank.js",
+    "bank:assemble": "node scripts/assemble-exercise-bank.js",
     "test": "node test/mastery.test.js && node test/exercises.test.js"
   },
   "dependencies": {
