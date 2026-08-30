@@ -2,7 +2,7 @@
 
 Zwei Dinge werden hier beschrieben:
 
-1. **Die 12 Übungsformate** – was sie trainieren, wie sie ausgewählt werden und
+1. **Die 21 Übungsformate** – was sie trainieren, wie sie ausgewählt werden und
    warum jedes eine eigene Ratechance hat.
 2. **Die Wortliste** – die Merkwörter im Hintergrund des Fehlerprofils. Sie
    entsteht ausschließlich aus echten, wiederholten Fehlern. Es wird nichts
@@ -31,6 +31,15 @@ keine Tastatureingabe – FehlerFix ist eine motorisch fördernde App.
 | `word_family` | Wortfamilie | Canvas | 0,08 | Ableiten (ä/äu) |
 | `sort_words` | Sortieren | Canvas | 0,45 | binäre Entscheidungen |
 | `sentence_from_words` | Satz bauen | Canvas | 0,08 | immer |
+| `plural_singular` | Einzahl/Mehrzahl | Canvas | 0,08 | immer |
+| `compound_words` | Wörter zusammensetzen | Canvas | 0,08 | immer |
+| `categorize_words` | Einsortieren (3 Gruppen) | Canvas | 0,33 | binäre/Silben-Kategorien |
+| `rhyme_pairs` | Reimpaare | Canvas | 0,10 | Silben/Laute |
+| `syllable_join` | Silben verbinden | Canvas | 0,08 | Silben/Laute |
+| `adjective_grading` | Adjektive steigern | Canvas | 0,12 | immer |
+| `verb_forms` | Verbformen bilden | Canvas | 0,12 | immer |
+| `sentence_type_transform` | Satzart umwandeln | Canvas | 0,15 | Zeichensetzung |
+| `letter_grid` | Buchstabengitter | Canvas | 0,05 | immer |
 
 ### Was die einzelnen Formate trainieren
 
@@ -74,6 +83,57 @@ Treffer hier stark ab.
 
 **Satz bauen** – Aus vorgegebenen Wörtern einen richtigen Satz bilden.
 Trainiert Groß-/Kleinschreibung und Zeichensetzung nebenbei.
+
+**Einzahl/Mehrzahl** – Zu vorgegebenen Wörtern die jeweils andere Zahlform
+schreiben. Bewusst Wörter mit uneinheitlicher Pluralbildung, damit wirklich
+etwas geübt wird statt nur „+e" anzuhängen.
+
+**Wörter zusammensetzen** – Aus zwei einfachen Nomen ein neues bilden
+(Schnee + Mann → Schneemann). Trainiert Wortbildung und Großschreibung von
+Nomen gleichzeitig.
+
+**Einsortieren** – Wie Sortieren, aber mit GENAU drei Gruppen statt zwei
+(z. B. Wochentage/Monate/Jahreszeiten). Deshalb eine eigene, niedrigere
+Ratechance (0,33 statt 0,45) – bei drei Gruppen ist Raten schon deutlich
+unsicherer als bei zweien. `sort_words` bleibt strikt bei zwei Gruppen; bei
+mehr Gruppen ist `categorize_words` das richtige Format.
+
+**Reimpaare** – Aus gemischt vorgegebenen Wörtern die sich reimenden Paare
+finden und zusammenschreiben. FRESCH-Schwingen: reimende Wörter klingen im
+Auslaut gleich.
+
+**Silben verbinden** – Ein Wort liegt durcheinandergewürfelt in seinen Silben
+vor, der Schüler bringt sie in die richtige Reihenfolge und schreibt das
+ganze Wort. FRESCH-Schwingen in Reinform.
+
+**Adjektive steigern** – Grundform, Komparativ, Superlativ zu vorgegebenen
+Adjektiven schreiben (schnell → schneller → am schnellsten).
+
+**Verbformen bilden** – Zur Grundform eines Verbs eine vorgegebene Form
+schreiben (z. B. die ich-Form oder die Vergangenheit).
+
+**Satzart umwandeln** – Einen Aussagesatz in eine Frage umformen (oder
+umgekehrt) und dabei das richtige Satzschlusszeichen setzen. Trainiert
+Zeichensetzung im Zusammenhang mit der Satzart, nicht mechanisch.
+
+**Buchstabengitter** – Wörter, die waagerecht/senkrecht in einem
+Buchstabenraster versteckt sind, finden und aufschreiben (nicht das ganze
+Gitter abschreiben).
+
+### Warum nicht jedes übersprungene Vorlagen-Format ein neues FehlerFix-Format wurde
+
+Beim ersten echten Pipeline-Lauf (Klasse 2, siehe
+[UEBUNGSBANK.md](UEBUNGSBANK.md)) gab es Übungstypen, die der Screener
+absichtlich NICHT übernommen hat – nicht weil ein Format fehlte, sondern weil
+sie zur Grundphilosophie der App nicht passen:
+
+- **Ankreuz-/Multiple-Choice-Aufgaben** ("Entscheide: kurz oder lang",
+  Verständnisfragen mit Auswahl) – FehlerFix ist eine motorisch fördernde
+  Handschrift-App, keine Auswahl-App. Das bleibt bewusst so.
+- **"Schreibe Sätze neben passende Bilder"** – das ist kein fehlendes Format,
+  sondern eine fehlende Fähigkeit: FehlerFix zeigt in Übungen aktuell keine
+  Bilder an. Das wäre ein eigenständiges, größeres Feature (Bildmaterial oder
+  KI-generierte Bilder pro Übung), keine Ergänzung der Formate-Liste.
 
 ### Wie ausgewählt wird
 
