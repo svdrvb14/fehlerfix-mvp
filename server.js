@@ -46,6 +46,7 @@ const mastery = require('./lib/mastery');
 const exercises = require('./lib/exercises');
 const wordRegister = require('./lib/wordregister');
 const island = require('./lib/island');
+const imageLibrary = require('./lib/imagelibrary');
 
 // Datenbank + Auth (optional – App läuft ohne Supabase im Gast-Modus weiter)
 const { supabase, isDbEnabled } = require('./lib/db');
@@ -1171,6 +1172,33 @@ function inkCandidatesBlock(inkCandidates) {
   );
 }
 
+/**
+ * Bild-Katalog für den Prompt – nur eingebunden, wenn das gewählte Format
+ * tatsächlich Bilder braucht (picture_sentence), damit andere Formate
+ * keinen unnötig langen Prompt bekommen.
+ */
+function pictureLibraryBlock(exType) {
+  if (exType !== 'picture_sentence') return '';
+  return (
+    'VERFÜGBARE BILD-KONZEPTE (nur diese Schlüssel dürfen verwendet werden):\n' +
+    imageLibrary.keysForPrompt() +
+    '\n\n'
+  );
+}
+
+/**
+ * Prüft die von der KI gelieferten "pictures" gegen den echten Katalog und
+ * löst gültige Schlüssel zur Anzeige auf (Emoji-Platzhalter oder – sobald
+ * vorhanden – echtes Bild). Ungültige, erfundene Schlüssel fallen raus,
+ * statt kaputt beim Kind anzukommen.
+ */
+function resolvePictures(pictures) {
+  if (!Array.isArray(pictures)) return [];
+  return pictures
+    .map((p) => imageLibrary.resolve(p?.key))
+    .filter(Boolean);
+}
+
 // ─────────────────────────────────────────────────────────────
 // ROUTE 2: /api/next-exercise – adaptive Übungsgenerierung
 // ─────────────────────────────────────────────────────────────
@@ -1257,6 +1285,7 @@ app.post('/api/next-exercise', async (req, res) => {
     `FOKUS-FEATURE FÜR DIESE ÜBUNG (fest vorgegeben): "${focusFeature}"\n` +
     `Diese Übung trainiert AUSSCHLIESSLICH dieses eine Feature. Keine anderen Themen.\n\n` +
     merkwoerterBlock(session) +
+    pictureLibraryBlock(exType) +
     chosen.spec + '\n\n' +
     exercises.globalRules(exType) +
     'ANTWORT AUSSCHLIESSLICH ALS JSON:\n' +
@@ -1272,6 +1301,9 @@ app.post('/api/next-exercise', async (req, res) => {
     (chosen.answerMode === 'cards'
       ? '  "cards": [ { "sentence": "Satz mit ___", "hint": "Umschreibung des gesuchten Wortes", ' +
         '"answer": "Wort", "full": "vollständiger richtiger Satz", "explanation": "kurze Erklärung" } ],\n'
+      : '') +
+    (exType === 'picture_sentence'
+      ? '  "pictures": [ { "key": "<Schlüssel exakt aus lib/imagelibrary.js>" } ],\n'
       : '') +
     '  "explanation": "<1-2 Sätze, erklärt die Regel/das WARUM des Features – wird NACH der Bewertung gezeigt>"\n' +
     '}\n\n' +
@@ -1338,6 +1370,15 @@ app.post('/api/next-exercise', async (req, res) => {
     // Bei audio_dictation: displayText immer leer halten (sonst sieht das Kind den Text)
     if (exType === 'audio_dictation') {
       exercise.displayText = '';
+    }
+    // Bilder: nur echte Katalog-Schlüssel durchlassen, erfundene rauswerfen.
+    // Ohne mindestens ein gültiges Bild ist die Übung unbrauchbar.
+    if (exType === 'picture_sentence') {
+      exercise.pictures = resolvePictures(exercise.pictures);
+      if (!exercise.pictures.length) {
+        console.error('[next-exercise] picture_sentence ohne gültige Bild-Schlüssel – KI-Antwort unbrauchbar.');
+        return res.status(502).json({ error: 'Übung konnte nicht erstellt werden.' });
+      }
     }
 
     session.lastFocusFeature = focusFeature;
@@ -1568,7 +1609,12 @@ app.post('/api/submit-exercise', async (req, res) => {
     `- Übungstyp: ${last.type}\n` +
     `- Fokus-Feature: ${last.focusFeature || session.lastFocusFeature}\n` +
     `- Angezeigter Text (Aufgabe): "${last.displayText}"\n` +
-    `- Erwartete korrekte Lösung: "${last.correctText}"\n\n` +
+    `- Erwartete korrekte Lösung: "${last.correctText}"\n` +
+    (Array.isArray(last.pictures) && last.pictures.length
+      ? `- Gezeigte Bilder (in dieser Reihenfolge, je ein Satz dazu erwartet): ` +
+        `${last.pictures.map((p) => p.label).join(', ')}\n`
+      : '') +
+    '\n' +
     inkCandidatesBlock(inkCandidates) +
     'BEKANNTE FEATURES (Memory):\n' +
     JSON.stringify(session.featureTable, null, 2) +

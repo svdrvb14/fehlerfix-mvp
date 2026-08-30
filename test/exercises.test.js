@@ -11,7 +11,7 @@ const check = (name, cond, detail = '') => {
 };
 
 console.log('\nÜbungsformate');
-check('einundzwanzig Formate registriert', ex.allIds().length === 21, `${ex.allIds().length}`);
+check('zweiundzwanzig Formate registriert', ex.allIds().length === 22, `${ex.allIds().length}`);
 check('jedes Format hat eine Beschreibung', ex.TYPES.every((t) => t.spec && t.spec.length > 40));
 check('jedes Format hat eine Ratechance', ex.TYPES.every((t) => t.guessRate > 0 && t.guessRate < 1));
 check('Antwortmodus ist gültig',

@@ -59,9 +59,10 @@ Schreibe eine JSON-Datei nach
   "topic": "<kurzes Schlagwort für die Überschrift>",
   "instruction": "<altersgerechte Aufgabenstellung ohne Antworten zu verraten>",
   "tips": ["<Achtsamkeit 1>", "<Achtsamkeit 2>", "<Achtsamkeit 3>"],
-  "display_text": "<Material – siehe Formatbeschreibung; leer bei audio_dictation>",
+  "display_text": "<Material – siehe Formatbeschreibung; leer bei audio_dictation und picture_sentence>",
   "correct_text": "<vollständig korrekte Lösung>",
   "cards": null,
+  "pictures": null,
   "explanation": "<1-2 Sätze zur Regel>",
   "source_file": "<aus der Vorgabe>",
   "source_page": "<aus der Vorgabe, oder null>",
@@ -78,3 +79,14 @@ du geschrieben hast (Nachweis, dass nie mehr als die Struktur einfloss).
 Kannst du aus der Vorgabe keine sinnvolle Übung bauen (z.B. Struktur zu
 vage), setze `quality_ok: false` mit kurzer Begründung statt etwas
 Halbgares abzuliefern.
+
+## Sonderfall: Format `picture_sentence`
+
+Lies zusätzlich `lib/imagelibrary.js` – der komplette Katalog erlaubter
+Bild-Schlüssel steht dort. Setze `"pictures": [ { "key": "..." } ]` mit
+AUSSCHLIESSLICH Schlüsseln aus diesem Katalog, `display_text` bleibt leer.
+Gibt es im Katalog kein passendes Konzept zur Vorgabe, setze `quality_ok:
+false` mit Begründung "kein passendes Bild im Katalog" – erfinde NIEMALS
+einen Schlüssel, der dort nicht steht. Das ist genauso hart wie die
+Clean-Room-Regel oben: ein erfundener Schlüssel würde beim Kind als
+kaputtes/fehlendes Bild ankommen.

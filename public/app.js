@@ -1320,6 +1320,23 @@ function renderExercise(exercise) {
   const displayEl = document.getElementById('ex-display-text');
   const dictationPlayerEl = document.getElementById('dictation-player');
 
+  // Bilder (nur bei picture_sentence) – der Server hat die Schlüssel schon zu
+  // { label, display, isPlaceholder } aufgelöst, hier wird nur noch angezeigt.
+  const picturesEl = document.getElementById('ex-pictures');
+  const pictures = Array.isArray(exercise.pictures) ? exercise.pictures : [];
+  if (pictures.length) {
+    picturesEl.innerHTML = pictures
+      .map((p) => `
+        <div class="picture-tile${p.isPlaceholder ? ' is-placeholder' : ''}">
+          <span class="picture-tile-img">${p.isPlaceholder ? escapeHtml(p.display) : `<img src="${escapeHtml(p.display)}" alt="" />`}</span>
+        </div>`)
+      .join('');
+    picturesEl.hidden = false;
+  } else {
+    picturesEl.innerHTML = '';
+    picturesEl.hidden = true;
+  }
+
   // Eventuell laufende Sprachausgabe stoppen (z.B. wenn vorherige Übung Audio war)
   tts.stop();
   resetDictationPlayerUI();

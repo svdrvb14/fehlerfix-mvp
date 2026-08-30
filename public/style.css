@@ -866,6 +866,32 @@ body {
 }
 
 /* Aufgaben-Text (Lückentext bzw. Fehlertext), den das Kind abschreiben soll */
+.pictures-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+.picture-tile {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.picture-tile-img {
+  font-size: 2.6rem;
+  line-height: 1;
+}
+.picture-tile-img img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 10px;
+}
+
 .display-text {
   margin-top: 14px;
   padding: 18px 22px;

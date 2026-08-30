@@ -107,6 +107,7 @@ async function main() {
     display_text: ex.display_text || '',
     correct_text: ex.correct_text,
     cards: ex.cards || null,
+    pictures: ex.pictures || null,
     explanation: ex.explanation || '',
     source_file: ex.source_file || null,
     source_page: ex.source_page || null,

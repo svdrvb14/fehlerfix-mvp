@@ -42,7 +42,10 @@ const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const MODEL = /^claude-/i.test(process.env.CLAUDE_MODEL || '') ? process.env.CLAUDE_MODEL.trim() : DEFAULT_MODEL;
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic() : null;
 
-const SOURCE_FORMATS = TYPES.filter((t) => t.answerMode === 'canvas').map((t) => t.id);
+// picture_sentence ausgeschlossen: braucht lib/imagelibrary.js als Kontext, aber
+// dieses Skript ruft Claude ohne Werkzeug-Zugriff auf – kann die Datei nicht lesen,
+// würde also Bild-Schlüssel erfinden. Nur die Agent-Pipeline (mit Read-Tool) darf das Format nutzen.
+const SOURCE_FORMATS = TYPES.filter((t) => t.answerMode === 'canvas' && t.id !== 'picture_sentence').map((t) => t.id);
 
 function parseArgs(argv) {
   const folder = argv[2];
