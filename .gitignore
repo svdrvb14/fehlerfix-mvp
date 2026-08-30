@@ -32,6 +32,7 @@ yarn-error.log*
 # Build artefacts
 dist/
 build/
+supabase/.temp/
 
 # Capacitor: native Projekte werden lokal erzeugt (brauchen Xcode/Android Studio).
 # Sobald sie eingerichtet sind, sollten ios/ und android/ mit eingecheckt werden –

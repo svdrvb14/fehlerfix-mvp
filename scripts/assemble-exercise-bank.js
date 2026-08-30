@@ -111,6 +111,7 @@ async function main() {
     source_file: ex.source_file || null,
     source_page: ex.source_page || null,
     quality_ok: ex.quality_ok !== false,
+    quality_reason: ex.quality_reason || null,
     reviewed: ex.quality_ok !== false,
     generation_method: ex.generation_method || 'inspired',
     structure_source: ex.structure_source || null,
